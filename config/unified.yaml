@@ -1,0 +1,105 @@
+# QLink 统一配置文件
+# 此文件整合了所有配置项，避免重复配置
+
+# 节点配置
+node:
+  id: "node-1"
+  name: "QLink Node 1"
+  version: "1.0.0"
+  data_dir: "./data"
+  capabilities:
+    - "did_resolution"
+    - "consensus"
+    - "storage"
+  metadata:
+    region: "us-west-1"
+    environment: "production"
+
+# 网络配置
+network:
+  listen_address: "0.0.0.0:8001"
+  listen_port: 8001
+  max_peers: 50
+  dial_timeout: "30s"
+  heartbeat_interval: "10s"
+  reconnect_interval: "30s"
+  message_timeout: "5s"
+  buffer_size: 1024
+  enable_tls: false
+  tls_cert_file: ""
+  tls_key_file: ""
+
+# 共识配置
+consensus:
+  algorithm: "raft"
+  election_timeout: "5s"
+  heartbeat_timeout: "2s"
+  log_retention: 1000
+  snapshot_interval: 100
+  max_log_entries: 10000
+
+# 集群配置
+cluster:
+  id: "qlink-cluster"
+  max_nodes: 10
+  min_nodes: 3
+  join_timeout: "30s"
+  sync_interval: "10s"
+  health_check_interval: "5s"
+  auto_join: true
+  bootstrap_nodes:
+    - "node-1:8001"
+    - "node-2:8002"
+    - "node-3:8003"
+
+# DID配置
+did:
+  method: "qlink"
+  network: "mainnet"
+  storage_type: "local"
+  storage_path: "./did_registry.json"
+  cache_size: 1000
+  enable_cache: true
+  validation_level: "strict"
+
+# API配置
+api:
+  listen_address: "0.0.0.0:8080"
+  listen_port: 8080
+  enable_cors: true
+  enable_metrics: true
+  enable_rate_limit: true
+  rate_limit: 100
+  read_timeout: "30s"
+  write_timeout: "30s"
+  max_request_size: 1048576
+  enable_tls: false
+  tls_cert_file: ""
+  tls_key_file: ""
+
+# 日志配置
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  max_size: 100
+  max_backups: 3
+  max_age: 28
+  compress: true
+
+# 存储配置
+storage:
+  type: "local"
+  path: "./storage"
+  sync: true
+  local:
+    path: "./storage/local"
+  ipfs:
+    gateway: "https://ipfs.io"
+
+# 同步配置
+sync:
+  sync_interval: "30s"
+  batch_size: 100
+  max_retries: 3
+  conflict_resolution: "latest"
