@@ -1,9 +1,8 @@
 package types
 
 import (
+	"encoding/json"
 	"time"
-
-	"github.com/qujing226/QLink/did"
 )
 
 // NodeState 节点状态
@@ -167,19 +166,86 @@ func (os OperationStatus) String() string {
 }
 
 // DIDOperation DID操作
+// DIDDocument DID文档结构
+type DIDDocument struct {
+	Context              []string             `json:"@context"`
+	ID                   string               `json:"id"`
+	VerificationMethod   []VerificationMethod `json:"verificationMethod,omitempty"`
+	Authentication       []string             `json:"authentication,omitempty"`
+	AssertionMethod      []string             `json:"assertionMethod,omitempty"`
+	KeyAgreement         []string             `json:"keyAgreement,omitempty"`
+	CapabilityInvocation []string             `json:"capabilityInvocation,omitempty"`
+	CapabilityDelegation []string             `json:"capabilityDelegation,omitempty"`
+	Service              []Service            `json:"service,omitempty"`
+	Created              *time.Time           `json:"created,omitempty"`
+	Updated              *time.Time           `json:"updated,omitempty"`
+	Deactivated          bool                 `json:"deactivated,omitempty"`
+	Status               string               `json:"status,omitempty"`
+	Proof                *Proof               `json:"proof,omitempty"`
+}
+
+// ToJSON 将DID文档转换为JSON
+func (doc *DIDDocument) ToJSON() ([]byte, error) {
+	return json.Marshal(doc)
+}
+
+// VerificationMethod 验证方法
+type VerificationMethod struct {
+	ID                 string                 `json:"id"`
+	Type               string                 `json:"type"`
+	Controller         string                 `json:"controller"`
+	PublicKeyJwk       interface{}            `json:"publicKeyJwk,omitempty"`
+	PublicKeyMultibase string                 `json:"publicKeyMultibase,omitempty"`
+	PublicKeyLattice   map[string]interface{} `json:"publicKeyLattice,omitempty"`
+}
+
+// Service 服务端点
+type Service struct {
+	ID              string      `json:"id"`
+	Type            string      `json:"type"`
+	ServiceEndpoint interface{} `json:"serviceEndpoint"`
+}
+
+// Proof 证明结构
+type Proof struct {
+	Type               string    `json:"type"`
+	Created            time.Time `json:"created"`
+	VerificationMethod string    `json:"verificationMethod"`
+	ProofPurpose       string    `json:"proofPurpose"`
+	ProofValue         string    `json:"proofValue"`
+}
+
+// TransactionType 交易类型
+type TransactionType string
+
+const (
+	TransactionTypeRegister TransactionType = "register"
+	TransactionTypeUpdate   TransactionType = "update"
+	TransactionTypeRevoke   TransactionType = "revoke"
+)
+
+// TransactionStatus 交易状态
+type TransactionStatus string
+
+const (
+	TransactionStatusPending   TransactionStatus = "pending"
+	TransactionStatusConfirmed TransactionStatus = "confirmed"
+	TransactionStatusFailed    TransactionStatus = "failed"
+)
+
 type DIDOperation struct {
-	Operation string           `json:"operation"` // "create", "update", "deactivate"
-	DID       string           `json:"did"`
-	Document  *did.DIDDocument `json:"document,omitempty"`
-	Proof     *did.Proof       `json:"proof,omitempty"`
+	Operation string       `json:"operation"` // "create", "update", "deactivate"
+	DID       string       `json:"did"`
+	Document  *DIDDocument `json:"document,omitempty"`
+	Proof     *Proof       `json:"proof,omitempty"`
 }
 
 // ConflictEntry 冲突条目
 type ConflictEntry struct {
-	NodeID    string           `json:"node_id"`
-	Document  *did.DIDDocument `json:"document"`
-	Timestamp time.Time        `json:"timestamp"`
-	Version   int64            `json:"version"`
+	NodeID    string       `json:"node_id"`
+	Document  *DIDDocument `json:"document"`
+	Timestamp time.Time    `json:"timestamp"`
+	Version   int64        `json:"version"`
 }
 
 // ConflictData 冲突数据

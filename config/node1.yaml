@@ -1,7 +1,7 @@
 # QLink Node 1 Configuration
 node:
   id: "node1"
-  type: "primary"
+  role: "authority"
   name: "QLink Primary Node"
   
 # 网络配置
@@ -17,7 +17,7 @@ cluster:
     - "qlink-node2:8081"
     - "qlink-node3:8081"
   consensus:
-    algorithm: "raft"
+    algorithm: "poa"
     election_timeout: "5s"
     heartbeat_timeout: "1s"
     

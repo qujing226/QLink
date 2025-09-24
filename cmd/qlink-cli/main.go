@@ -177,8 +177,32 @@ func initClient() error {
 
 // loadKeyPair 加载密钥对
 func loadKeyPair() error {
-	// TODO: 实现密钥对的加载逻辑
-	return clientInst.GenerateKeyPair()
+	// 检查密钥文件是否存在
+	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+		// 如果密钥文件不存在，生成新的密钥对
+		log.Printf("密钥文件 %s 不存在，生成新的密钥对", keyFile)
+		return clientInst.GenerateKeyPair()
+	}
+
+	// 读取密钥文件
+	keyData, err := os.ReadFile(keyFile)
+	if err != nil {
+		return fmt.Errorf("读取密钥文件失败: %v", err)
+	}
+
+	// 解析密钥数据
+	var keyPair crypto.HybridKeyPair
+	if err := json.Unmarshal(keyData, &keyPair); err != nil {
+		return fmt.Errorf("解析密钥文件失败: %v", err)
+	}
+
+	// 验证密钥对的有效性
+	if keyPair.ECDSAPrivateKey == nil || keyPair.KyberDecapsulationKey == nil {
+		return fmt.Errorf("密钥文件格式无效")
+	}
+
+	log.Printf("成功加载密钥对从文件: %s", keyFile)
+	return nil
 }
 
 // getClientPublicKeyJWK 获取客户端公钥JWK

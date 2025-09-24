@@ -7,8 +7,9 @@ import (
 	"strings"
 
 	"github.com/qujing226/QLink/did/blockchain"
-	"github.com/qujing226/QLink/did/config"
-	"github.com/qujing226/QLink/did/utils"
+	"github.com/qujing226/QLink/pkg/config"
+	"github.com/qujing226/QLink/pkg/types"
+	"github.com/qujing226/QLink/pkg/utils"
 )
 
 // DIDResolver DID解析器
@@ -20,7 +21,7 @@ type DIDResolver struct {
 
 // ResolutionResult DID解析结果
 type ResolutionResult struct {
-	DIDDocument           *DIDDocument        `json:"didDocument,omitempty"`
+	DIDDocument           *types.DIDDocument  `json:"didDocument,omitempty"`
 	DIDResolutionMetadata *ResolutionMetadata `json:"didResolutionMetadata"`
 	DIDDocumentMetadata   *DocumentMetadata   `json:"didDocumentMetadata"`
 }
@@ -143,7 +144,7 @@ func (r *DIDResolver) extractMethod(didStr string) string {
 }
 
 // ResolveVerificationMethod 解析验证方法
-func (r *DIDResolver) ResolveVerificationMethod(didURL string) (*VerificationMethod, error) {
+func (r *DIDResolver) ResolveVerificationMethod(didURL string) (*types.VerificationMethod, error) {
 	// 解析DID URL
 	parts := strings.Split(didURL, "#")
 	if len(parts) != 2 {
@@ -160,7 +161,7 @@ func (r *DIDResolver) ResolveVerificationMethod(didURL string) (*VerificationMet
 	}
 
 	if result.DIDDocument == nil {
-		return nil, utils.NewErrorWithDetails(utils.ErrorTypeNotFound, "DID_DOCUMENT_NOT_FOUND", 
+		return nil, utils.NewErrorWithDetails(utils.ErrorTypeNotFound, "DID_DOCUMENT_NOT_FOUND",
 			"DID文档不存在", didStr)
 	}
 
@@ -171,7 +172,7 @@ func (r *DIDResolver) ResolveVerificationMethod(didURL string) (*VerificationMet
 		}
 	}
 
-	return nil, utils.NewErrorWithDetails(utils.ErrorTypeNotFound, "VERIFICATION_METHOD_NOT_FOUND", 
+	return nil, utils.NewErrorWithDetails(utils.ErrorTypeNotFound, "VERIFICATION_METHOD_NOT_FOUND",
 		"验证方法不存在", fragment)
 }
 
@@ -192,7 +193,7 @@ func (r *DIDResolver) IsSupported(method string) bool {
 }
 
 // resolveFromOffchain 从链下存储解析
-func (r *DIDResolver) resolveFromOffchain(didStr string) (*DIDDocument, error) {
+func (r *DIDResolver) resolveFromOffchain(didStr string) (*types.DIDDocument, error) {
 	if r.storage == nil {
 		return nil, fmt.Errorf("存储管理器未初始化")
 	}
@@ -207,7 +208,7 @@ func (r *DIDResolver) resolveFromOffchain(didStr string) (*DIDDocument, error) {
 	}
 
 	// 反序列化DID文档
-	var doc DIDDocument
+	var doc types.DIDDocument
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("反序列化DID文档失败: %w", err)
 	}

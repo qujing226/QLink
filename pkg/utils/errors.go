@@ -18,6 +18,7 @@ const (
 	ErrorTypeNetwork       ErrorType = "NETWORK"
 	ErrorTypeTimeout       ErrorType = "TIMEOUT"
 	ErrorTypeInvalidFormat ErrorType = "INVALID_FORMAT"
+	ErrorTypeBlockchain    ErrorType = "BLOCKCHAIN"
 )
 
 // AppError 应用程序错误

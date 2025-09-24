@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/qujing226/QLink/did/consensus"
+	"github.com/qujing226/QLink/pkg/consensus"
 )
 
 // ConsensusAPI 共识API接口

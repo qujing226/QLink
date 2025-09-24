@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qujing226/QLink/did/config"
-	"github.com/qujing226/QLink/did/utils"
+	"github.com/qujing226/QLink/pkg/config"
+	"github.com/qujing226/QLink/pkg/types"
+	"github.com/qujing226/QLink/pkg/utils"
 )
 
 // BatchOperationResult 批量操作结果
@@ -33,7 +34,7 @@ type BatchUpdateRequest struct {
 // BatchRevokeRequest 批量撤销请求
 type BatchRevokeRequest struct {
 	DIDs    []string      `json:"dids"`
-	Proof   *Proof        `json:"proof"`
+	Proof   *types.Proof  `json:"proof"`
 	Options *BatchOptions `json:"options,omitempty"`
 }
 
@@ -65,8 +66,10 @@ type BatchDIDRegistry struct {
 
 // NewBatchDIDRegistry 创建批量DID注册表
 func NewBatchDIDRegistry(cfg *config.Config, blockchain interface{}) *BatchDIDRegistry {
+	// 将interface{}转换为BlockchainInterface
+	blockchainInterface := blockchain.(BlockchainInterface)
 	return &BatchDIDRegistry{
-		registry: NewDIDRegistry(cfg, blockchain),
+		registry: NewDIDRegistry(blockchainInterface),
 		metrics:  NewMetrics(),
 	}
 }
@@ -403,13 +406,13 @@ func (br *BatchDIDRegistry) GetBatchMetrics() map[string]interface{} {
 
 // BatchOperationStats 批量操作统计
 type BatchOperationStats struct {
-	TotalOperations   int           `json:"total_operations"`
-	SuccessfulOps     int           `json:"successful_ops"`
-	FailedOps         int           `json:"failed_ops"`
-	AverageTime       time.Duration `json:"average_time"`
-	TotalTime         time.Duration `json:"total_time"`
-	ConcurrencyLevel  int           `json:"concurrency_level"`
-	RetryCount        int           `json:"retry_count"`
+	TotalOperations  int           `json:"total_operations"`
+	SuccessfulOps    int           `json:"successful_ops"`
+	FailedOps        int           `json:"failed_ops"`
+	AverageTime      time.Duration `json:"average_time"`
+	TotalTime        time.Duration `json:"total_time"`
+	ConcurrencyLevel int           `json:"concurrency_level"`
+	RetryCount       int           `json:"retry_count"`
 }
 
 // AnalyzeBatchResults 分析批量操作结果

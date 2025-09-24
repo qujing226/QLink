@@ -12,9 +12,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/qujing226/QLink/did"
-	"github.com/qujing226/QLink/did/api"
-	"github.com/qujing226/QLink/did/consensus"
-	"github.com/qujing226/QLink/did/network"
+	"github.com/qujing226/QLink/pkg/api"
+	"github.com/qujing226/QLink/pkg/config"
+	"github.com/qujing226/QLink/pkg/consensus"
+	"github.com/qujing226/QLink/pkg/network"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,12 +31,12 @@ func SetupTestConsensusAPI(t *testing.T) *TestConsensusAPI {
 	gin.SetMode(gin.TestMode)
 
 	// 创建模拟依赖
-	raftNode := consensus.NewRaftNode("test-node-1") // 使用NewRaftNode创建完整实例
-	didRegistry := &did.DIDRegistry{}                // 简化的模拟对象
-	p2pNetwork := &network.P2PNetwork{}              // 简化的模拟对象
+	p2pNetwork := &network.P2PNetwork{}                          // 简化的模拟对象
+	raftNode := consensus.NewRaftNode("test-node-1", p2pNetwork) // 使用NewRaftNode创建完整实例
+	didRegistry := &did.DIDRegistry{}                            // 简化的模拟对象
 
 	// 创建共识配置
-	config := &consensus.ConsensusConfig{
+	config := &config.ConsensusConfig{
 		ProposalTimeout:     5 * time.Second,
 		CommitTimeout:       3 * time.Second,
 		MaxPendingProposals: 100,

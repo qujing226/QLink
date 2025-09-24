@@ -250,7 +250,7 @@ func (hkp *HybridKeyPair) HybridEncrypt(data []byte, recipientPublicKey *HybridK
 	// 为了演示，这里只是简单的XOR操作
 	encryptedData = make([]byte, len(data)+len(ciphertext))
 	copy(encryptedData[:len(ciphertext)], ciphertext)
-	
+
 	// 使用共享密钥的前几个字节作为XOR密钥
 	keyBytes := sharedKey[:min(len(sharedKey), len(data))]
 	for i := 0; i < len(data); i++ {
@@ -272,7 +272,7 @@ func (hkp *HybridKeyPair) HybridDecrypt(encryptedData []byte, signature *HybridS
 	if len(encryptedData) < mlkem.CiphertextSize768 {
 		return nil, fmt.Errorf("加密数据长度不足")
 	}
-	
+
 	ciphertext := encryptedData[:mlkem.CiphertextSize768]
 	encryptedPayload := encryptedData[mlkem.CiphertextSize768:]
 

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/qujing226/QLink/did/crypto"
+	"github.com/qujing226/QLink/pkg/types"
 )
 
 // DIDDocumentBuilder DID文档构建器
@@ -48,7 +49,7 @@ func NewDIDDocumentBuilderFromKeyPair(keyPair *crypto.HybridKeyPair) (*DIDDocume
 }
 
 // BuildDocument 构建DID文档
-func (builder *DIDDocumentBuilder) BuildDocument() (*DIDDocument, error) {
+func (builder *DIDDocumentBuilder) BuildDocument() (*types.DIDDocument, error) {
 	// 将公钥转换为JWK格式
 	jwk, err := builder.keyPair.ToJWK()
 	if err != nil {
@@ -59,26 +60,27 @@ func (builder *DIDDocumentBuilder) BuildDocument() (*DIDDocument, error) {
 	verificationMethodID := fmt.Sprintf("%s#key-1", builder.did)
 
 	// 创建验证方法
-	verificationMethod := VerificationMethod{
+	verificationMethod := types.VerificationMethod{
 		ID:           verificationMethodID,
 		Type:         "JsonWebKey2020",
 		Controller:   builder.did,
 		PublicKeyJwk: jwk,
 	}
 
+	now := time.Now()
 	// 创建DID文档
-	doc := &DIDDocument{
+	doc := &types.DIDDocument{
 		Context: []string{
 			"https://www.w3.org/ns/did/v1",
 			"https://w3id.org/security/suites/jws-2020/v1",
 		},
 		ID:                 builder.did,
-		VerificationMethod: []VerificationMethod{verificationMethod},
+		VerificationMethod: []types.VerificationMethod{verificationMethod},
 		Authentication:     []string{verificationMethodID},
 		AssertionMethod:    []string{verificationMethodID},
 		KeyAgreement:       []string{verificationMethodID},
-		Created:            time.Now(),
-		Updated:            time.Now(),
+		Created:            &now,
+		Updated:            &now,
 		Status:             "active",
 	}
 
@@ -102,7 +104,7 @@ func (builder *DIDDocumentBuilder) GetKeyPair() *crypto.HybridKeyPair {
 }
 
 // SignDocument 对DID文档进行签名
-func (builder *DIDDocumentBuilder) SignDocument(doc *DIDDocument) error {
+func (builder *DIDDocumentBuilder) SignDocument(doc *types.DIDDocument) error {
 	// 序列化文档用于签名
 	docData, err := doc.ToJSON()
 	if err != nil {
@@ -116,12 +118,12 @@ func (builder *DIDDocumentBuilder) SignDocument(doc *DIDDocument) error {
 	}
 
 	// 创建证明
-	proof := &Proof{
+	proof := &types.Proof{
 		Type:               "JsonWebSignature2020",
 		Created:            time.Now(),
 		VerificationMethod: fmt.Sprintf("%s#key-1", builder.did),
 		ProofPurpose:       "assertionMethod",
-		Jws:                fmt.Sprintf("%x", signature.ECDSASignature),
+		ProofValue:         fmt.Sprintf("%x", signature.ECDSASignature),
 	}
 
 	doc.Proof = proof
@@ -129,7 +131,7 @@ func (builder *DIDDocumentBuilder) SignDocument(doc *DIDDocument) error {
 }
 
 // VerifyDocument 验证DID文档签名
-func VerifyDocument(doc *DIDDocument, keyPair *crypto.HybridKeyPair) error {
+func VerifyDocument(doc *types.DIDDocument, keyPair *crypto.HybridKeyPair) error {
 	if doc.Proof == nil {
 		return fmt.Errorf("文档没有证明")
 	}
@@ -149,7 +151,7 @@ func VerifyDocument(doc *DIDDocument, keyPair *crypto.HybridKeyPair) error {
 	doc.Proof = originalProof
 
 	// 解析签名
-	signatureBytes := []byte(originalProof.Jws) // 简化处理，实际需要从hex解码
+	signatureBytes := []byte(originalProof.ProofValue) // 使用ProofValue字段而不是Jws
 	signature := &crypto.HybridSignature{
 		ECDSASignature: signatureBytes,
 	}
@@ -186,7 +188,7 @@ func (builder *DIDDocumentBuilder) CreateRegistrationRequest() (*RegisterRequest
 }
 
 // CreateUpdateRequest 创建DID更新请求
-func (builder *DIDDocumentBuilder) CreateUpdateRequest(newServices []Service) (*UpdateRequest, error) {
+func (builder *DIDDocumentBuilder) CreateUpdateRequest(newServices []types.Service) (*UpdateRequest, error) {
 	// 构建更新的DID文档
 	doc, err := builder.BuildDocument()
 	if err != nil {
@@ -213,7 +215,7 @@ func (builder *DIDDocumentBuilder) CreateUpdateRequest(newServices []Service) (*
 }
 
 // ValidateDIDDocument 验证DID文档的完整性
-func ValidateDIDDocument(doc *DIDDocument) error {
+func ValidateDIDDocument(doc *types.DIDDocument) error {
 	if doc == nil {
 		return fmt.Errorf("DID文档为空")
 	}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/qujing226/QLink/pkg/types"
 )
 
 // CacheEntry 缓存条目
@@ -13,7 +15,7 @@ type CacheEntry struct {
 	CreatedAt time.Time   `json:"created_at"`
 }
 
-// IsExpired 检查缓存是否过期
+// IsExpired 检查是否过期
 func (ce *CacheEntry) IsExpired() bool {
 	return time.Now().After(ce.ExpiresAt)
 }
@@ -30,10 +32,10 @@ type DIDCache interface {
 
 // CacheStats 缓存统计信息
 type CacheStats struct {
-	Hits        int64 `json:"hits"`
-	Misses      int64 `json:"misses"`
-	Size        int   `json:"size"`
-	HitRate     float64 `json:"hit_rate"`
+	Hits        int64     `json:"hits"`
+	Misses      int64     `json:"misses"`
+	Size        int       `json:"size"`
+	HitRate     float64   `json:"hit_rate"`
 	LastCleanup time.Time `json:"last_cleanup"`
 }
 
@@ -50,7 +52,7 @@ type MemoryCache struct {
 
 // NewMemoryCache 创建内存缓存
 func NewMemoryCache(maxSize int, defaultTTL, cleanupTick time.Duration) *MemoryCache {
-	cache := &MemoryCache{
+	mc := &MemoryCache{
 		data:        make(map[string]*CacheEntry),
 		maxSize:     maxSize,
 		defaultTTL:  defaultTTL,
@@ -58,10 +60,9 @@ func NewMemoryCache(maxSize int, defaultTTL, cleanupTick time.Duration) *MemoryC
 		stopCleanup: make(chan struct{}),
 	}
 
-	// 启动清理协程
-	go cache.startCleanup()
+	go mc.startCleanup()
 
-	return cache
+	return mc
 }
 
 // Get 获取缓存值
@@ -76,13 +77,8 @@ func (mc *MemoryCache) Get(key string) (interface{}, bool) {
 	}
 
 	if entry.IsExpired() {
+		delete(mc.data, key)
 		mc.stats.Misses++
-		// 延迟删除过期条目
-		go func() {
-			mc.mu.Lock()
-			delete(mc.data, key)
-			mc.mu.Unlock()
-		}()
 		return nil, false
 	}
 
@@ -94,11 +90,6 @@ func (mc *MemoryCache) Get(key string) (interface{}, bool) {
 func (mc *MemoryCache) Set(key string, value interface{}, ttl time.Duration) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
-
-	// 如果最大容量为0或负数，不存储任何内容
-	if mc.maxSize <= 0 {
-		return
-	}
 
 	if ttl == 0 {
 		ttl = mc.defaultTTL
@@ -141,16 +132,20 @@ func (mc *MemoryCache) Size() int {
 func (mc *MemoryCache) Stats() CacheStats {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
-	
-	stats := mc.stats
-	stats.Size = len(mc.data)
-	
-	total := stats.Hits + stats.Misses
+
+	total := mc.stats.Hits + mc.stats.Misses
+	hitRate := 0.0
 	if total > 0 {
-		stats.HitRate = float64(stats.Hits) / float64(total)
+		hitRate = float64(mc.stats.Hits) / float64(total)
 	}
-	
-	return stats
+
+	return CacheStats{
+		Hits:        mc.stats.Hits,
+		Misses:      mc.stats.Misses,
+		Size:        len(mc.data),
+		HitRate:     hitRate,
+		LastCleanup: mc.stats.LastCleanup,
+	}
 }
 
 // Close 关闭缓存
@@ -178,13 +173,13 @@ func (mc *MemoryCache) cleanup() {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
-	now := time.Now()
 	for key, entry := range mc.data {
 		if entry.IsExpired() {
 			delete(mc.data, key)
 		}
 	}
-	mc.stats.LastCleanup = now
+
+	mc.stats.LastCleanup = time.Now()
 }
 
 // evictOldest 删除最旧的条目
@@ -236,7 +231,7 @@ func (cr *CachedDIDResolver) Resolve(didStr string) (*ResolutionResult, error) {
 		return nil, err
 	}
 
-	// 只缓存成功的解析结果
+	// 缓存解析结果
 	if result.DIDDocument != nil {
 		cr.cache.Set(cacheKey, result, cr.cacheTTL)
 	}
@@ -245,11 +240,11 @@ func (cr *CachedDIDResolver) Resolve(didStr string) (*ResolutionResult, error) {
 }
 
 // ResolveVerificationMethod 解析验证方法（带缓存）
-func (cr *CachedDIDResolver) ResolveVerificationMethod(didURL string) (*VerificationMethod, error) {
+func (cr *CachedDIDResolver) ResolveVerificationMethod(didURL string) (*types.VerificationMethod, error) {
 	// 尝试从缓存获取
 	cacheKey := fmt.Sprintf("did:vm:%s", didURL)
 	if cached, found := cr.cache.Get(cacheKey); found {
-		if vm, ok := cached.(*VerificationMethod); ok {
+		if vm, ok := cached.(*types.VerificationMethod); ok {
 			return vm, nil
 		}
 	}
@@ -268,14 +263,12 @@ func (cr *CachedDIDResolver) ResolveVerificationMethod(didURL string) (*Verifica
 
 // InvalidateCache 使缓存失效
 func (cr *CachedDIDResolver) InvalidateCache(didStr string) {
-	// 删除DID解析缓存
-	resolveKey := fmt.Sprintf("did:resolve:%s", didStr)
-	cr.cache.Delete(resolveKey)
+	cacheKey := fmt.Sprintf("did:resolve:%s", didStr)
+	cr.cache.Delete(cacheKey)
 
-	// 删除相关的验证方法缓存
-	// 这里简化处理，实际应该维护DID与验证方法的映射关系
-	vmKey := fmt.Sprintf("did:vm:%s#", didStr)
-	cr.cache.Delete(vmKey)
+	// 同时删除相关的验证方法缓存
+	vmCacheKey := fmt.Sprintf("did:vm:%s", didStr)
+	cr.cache.Delete(vmCacheKey)
 }
 
 // GetCacheStats 获取缓存统计信息
@@ -300,7 +293,7 @@ func NewCachedDIDRegistry(registry *DIDRegistry, cache DIDCache, cacheTTL time.D
 }
 
 // Register 注册DID（更新缓存）
-func (cr *CachedDIDRegistry) Register(req *RegisterRequest) (*DIDDocument, error) {
+func (cr *CachedDIDRegistry) Register(req *RegisterRequest) (*types.DIDDocument, error) {
 	doc, err := cr.registry.Register(req)
 	if err != nil {
 		return nil, err
@@ -314,11 +307,11 @@ func (cr *CachedDIDRegistry) Register(req *RegisterRequest) (*DIDDocument, error
 }
 
 // Resolve 解析DID（带缓存）
-func (cr *CachedDIDRegistry) Resolve(didStr string) (*DIDDocument, error) {
+func (cr *CachedDIDRegistry) Resolve(didStr string) (*types.DIDDocument, error) {
 	// 尝试从缓存获取
 	cacheKey := fmt.Sprintf("did:doc:%s", didStr)
 	if cached, found := cr.cache.Get(cacheKey); found {
-		if doc, ok := cached.(*DIDDocument); ok {
+		if doc, ok := cached.(*types.DIDDocument); ok {
 			return doc, nil
 		}
 	}
@@ -336,7 +329,7 @@ func (cr *CachedDIDRegistry) Resolve(didStr string) (*DIDDocument, error) {
 }
 
 // Update 更新DID（更新缓存）
-func (cr *CachedDIDRegistry) Update(req *UpdateRequest) (*DIDDocument, error) {
+func (cr *CachedDIDRegistry) Update(req *UpdateRequest) (*types.DIDDocument, error) {
 	doc, err := cr.registry.Update(req)
 	if err != nil {
 		return nil, err
@@ -350,7 +343,7 @@ func (cr *CachedDIDRegistry) Update(req *UpdateRequest) (*DIDDocument, error) {
 }
 
 // Revoke 撤销DID（删除缓存）
-func (cr *CachedDIDRegistry) Revoke(didStr string, proof *Proof) error {
+func (cr *CachedDIDRegistry) Revoke(didStr string, proof *types.Proof) error {
 	err := cr.registry.Revoke(didStr, proof)
 	if err != nil {
 		return err
@@ -364,7 +357,7 @@ func (cr *CachedDIDRegistry) Revoke(didStr string, proof *Proof) error {
 }
 
 // List 列出所有DID
-func (cr *CachedDIDRegistry) List() ([]*DIDDocument, error) {
+func (cr *CachedDIDRegistry) List() ([]*types.DIDDocument, error) {
 	return cr.registry.List()
 }
 

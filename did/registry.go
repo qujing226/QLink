@@ -1,106 +1,69 @@
 package did
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/qujing226/QLink/did/config"
-	"github.com/qujing226/QLink/did/utils"
+	"github.com/qujing226/QLink/pkg/types"
 )
 
 // DIDRegistry DID注册表
 type DIDRegistry struct {
-	config     *config.Config
-	blockchain interface{}             // 区块链接口
-	storage    map[string]*DIDDocument // 内存存储，实际应该用数据库
+	blockchain BlockchainInterface           // 区块链接口
+	storage    map[string]*types.DIDDocument // 内存存储，实际应该用数据库
 	mu         sync.RWMutex
-}
-
-// DIDDocument DID文档结构
-type DIDDocument struct {
-	Context            []string             `json:"@context"`
-	ID                 string               `json:"id"`
-	VerificationMethod []VerificationMethod `json:"verificationMethod,omitempty"`
-	Authentication     []string             `json:"authentication,omitempty"`
-	AssertionMethod    []string             `json:"assertionMethod,omitempty"`
-	KeyAgreement       []string             `json:"keyAgreement,omitempty"`
-	Service            []Service            `json:"service,omitempty"`
-	Created            time.Time            `json:"created"`
-	Updated            time.Time            `json:"updated"`
-	Proof              *Proof               `json:"proof,omitempty"`
-	Status             string               `json:"status"` // active, revoked
-}
-
-// VerificationMethod 验证方法
-type VerificationMethod struct {
-	ID                 string      `json:"id"`
-	Type               string      `json:"type"`
-	Controller         string      `json:"controller"`
-	PublicKeyMultibase string      `json:"publicKeyMultibase,omitempty"`
-	PublicKeyJwk       interface{} `json:"publicKeyJwk,omitempty"`
-}
-
-// Service 服务端点
-type Service struct {
-	ID              string `json:"id"`
-	Type            string `json:"type"`
-	ServiceEndpoint string `json:"serviceEndpoint"`
-}
-
-// Proof 证明
-type Proof struct {
-	Type               string    `json:"type"`
-	Created            time.Time `json:"created"`
-	VerificationMethod string    `json:"verificationMethod"`
-	ProofPurpose       string    `json:"proofPurpose"`
-	Jws                string    `json:"jws"`
 }
 
 // RegisterRequest DID注册请求
 type RegisterRequest struct {
-	DID                string               `json:"did"`
-	VerificationMethod []VerificationMethod `json:"verificationMethod"`
-	Service            []Service            `json:"service,omitempty"`
+	DID                string                     `json:"did"`
+	VerificationMethod []types.VerificationMethod `json:"verificationMethod"`
+	Service            []types.Service            `json:"service,omitempty"`
 }
 
 // UpdateRequest DID更新请求
 type UpdateRequest struct {
-	DID                string               `json:"did"`
-	VerificationMethod []VerificationMethod `json:"verificationMethod,omitempty"`
-	Service            []Service            `json:"service,omitempty"`
-	Proof              *Proof               `json:"proof"`
+	DID                string                     `json:"did"`
+	VerificationMethod []types.VerificationMethod `json:"verificationMethod,omitempty"`
+	Service            []types.Service            `json:"service,omitempty"`
+	Proof              *types.Proof               `json:"proof"`
 }
 
-// NewDIDRegistry 创建DID注册表
-func NewDIDRegistry(cfg *config.Config, blockchain interface{}) *DIDRegistry {
+// NewDIDRegistry 创建DID注册表实例
+func NewDIDRegistry(blockchain BlockchainInterface) *DIDRegistry {
 	return &DIDRegistry{
-		config:     cfg,
 		blockchain: blockchain,
-		storage:    make(map[string]*DIDDocument),
+		storage:    make(map[string]*types.DIDDocument),
 	}
 }
 
 // Register 注册DID
-func (r *DIDRegistry) Register(req *RegisterRequest) (*DIDDocument, error) {
+func (r *DIDRegistry) Register(req *RegisterRequest) (*types.DIDDocument, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// 验证DID格式
 	if err := r.validateDID(req.DID); err != nil {
-		return nil, utils.WrapValidationError(err, "DID")
+		return nil, err
 	}
 
 	// 检查DID是否已存在
 	if _, exists := r.storage[req.DID]; exists {
-		return nil, utils.NewErrorWithDetails(utils.ErrorTypeConflict, "DID_EXISTS", 
-			"DID已存在", req.DID)
+		return nil, &DIDError{
+			Type:    ErrorTypeConflict,
+			Code:    "DID_EXISTS",
+			Message: "DID已存在",
+			Details: req.DID,
+		}
 	}
 
 	// 创建DID文档
-	doc := &DIDDocument{
+	now := time.Now()
+	doc := &types.DIDDocument{
 		Context: []string{
 			"https://www.w3.org/ns/did/v1",
 			"https://w3id.org/security/suites/jws-2020/v1",
@@ -108,8 +71,8 @@ func (r *DIDRegistry) Register(req *RegisterRequest) (*DIDDocument, error) {
 		ID:                 req.DID,
 		VerificationMethod: req.VerificationMethod,
 		Service:            req.Service,
-		Created:            time.Now(),
-		Updated:            time.Now(),
+		Created:            &now,
+		Updated:            &now,
 		Status:             "active",
 	}
 
@@ -122,48 +85,63 @@ func (r *DIDRegistry) Register(req *RegisterRequest) (*DIDDocument, error) {
 	// 存储DID文档
 	r.storage[req.DID] = doc
 
-	// TODO: 将DID注册交易提交到区块链
-	log.Printf("注册DID: %s", req.DID)
+	// 提交DID注册交易到区块链
+	if r.blockchain != nil {
+		tx, err := r.blockchain.RegisterDID(context.Background(), doc)
+		if err != nil {
+			// 区块链注册失败时，记录错误但不阻止DID注册
+			log.Printf("区块链注册失败，但DID已在内存中注册: %s, 错误: %v", doc.ID, err)
+		} else {
+			log.Printf("DID注册交易已提交到区块链: %s, 交易哈希: %s", doc.ID, tx.Hash)
+		}
+	} else {
+		log.Printf("注册DID (仅内存存储): %s", req.DID)
+	}
 
 	return doc, nil
 }
 
 // Resolve 解析DID
-func (r *DIDRegistry) Resolve(didStr string) (*DIDDocument, error) {
+func (r *DIDRegistry) Resolve(didStr string) (*types.DIDDocument, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	doc, exists := r.storage[didStr]
 	if !exists {
-		return nil, utils.NewErrorWithDetails(utils.ErrorTypeNotFound, "DID_NOT_FOUND", 
-			"DID不存在", didStr)
-	}
-
-	if doc.Status == "revoked" {
-		return nil, utils.NewErrorWithDetails(utils.ErrorTypeValidation, "DID_REVOKED", 
-			"DID已被撤销", didStr)
+		return nil, &DIDError{
+			Type:    ErrorTypeNotFound,
+			Code:    "DID_NOT_FOUND",
+			Message: "DID不存在",
+			Details: didStr,
+		}
 	}
 
 	return doc, nil
 }
 
 // Update 更新DID
-func (r *DIDRegistry) Update(req *UpdateRequest) (*DIDDocument, error) {
+func (r *DIDRegistry) Update(req *UpdateRequest) (*types.DIDDocument, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	doc, exists := r.storage[req.DID]
 	if !exists {
-		return nil, utils.NewErrorWithDetails(utils.ErrorTypeNotFound, "DID_NOT_FOUND", 
-			"DID不存在", req.DID)
+		return nil, &DIDError{
+			Type:    ErrorTypeNotFound,
+			Code:    "DID_NOT_FOUND",
+			Message: "DID不存在",
+			Details: req.DID,
+		}
 	}
 
 	if doc.Status == "revoked" {
-		return nil, utils.NewErrorWithDetails(utils.ErrorTypeValidation, "DID_REVOKED", 
-			"DID已被撤销", req.DID)
+		return nil, &DIDError{
+			Type:    ErrorTypeValidation,
+			Code:    "DID_REVOKED",
+			Message: "DID已被撤销",
+			Details: req.DID,
+		}
 	}
-
-	// TODO: 验证更新权限和签名
 
 	// 更新文档
 	if len(req.VerificationMethod) > 0 {
@@ -181,50 +159,76 @@ func (r *DIDRegistry) Update(req *UpdateRequest) (*DIDDocument, error) {
 		doc.Service = req.Service
 	}
 
-	doc.Updated = time.Now()
+	now := time.Now()
+	doc.Updated = &now
 	doc.Proof = req.Proof
 
-	// TODO: 将DID更新交易提交到区块链
-	log.Printf("更新DID: %s", req.DID)
+	// 提交DID更新交易到区块链
+	if r.blockchain != nil {
+		tx, err := r.blockchain.UpdateDID(context.Background(), req.DID, doc, req.Proof)
+		if err != nil {
+			log.Printf("区块链更新失败，但继续内存更新: %v", err)
+		} else {
+			log.Printf("DID更新交易已提交到区块链: %s, 交易哈希: %s", req.DID, tx.Hash)
+		}
+	} else {
+		log.Printf("仅内存更新DID: %s", req.DID)
+	}
 
 	return doc, nil
 }
 
 // Revoke 撤销DID
-func (r *DIDRegistry) Revoke(didStr string, proof *Proof) error {
+func (r *DIDRegistry) Revoke(didStr string, proof *types.Proof) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	doc, exists := r.storage[didStr]
 	if !exists {
-		return utils.NewErrorWithDetails(utils.ErrorTypeNotFound, "DID_NOT_FOUND", 
-			"DID不存在", didStr)
+		return &DIDError{
+			Type:    ErrorTypeNotFound,
+			Code:    "DID_NOT_FOUND",
+			Message: "DID不存在",
+			Details: didStr,
+		}
 	}
 
 	if doc.Status == "revoked" {
-		return utils.NewErrorWithDetails(utils.ErrorTypeValidation, "DID_REVOKED", 
-			"DID已被撤销", didStr)
+		return &DIDError{
+			Type:    ErrorTypeValidation,
+			Code:    "DID_ALREADY_REVOKED",
+			Message: "DID已被撤销",
+			Details: didStr,
+		}
 	}
 
-	// TODO: 验证撤销权限和签名
-
-	// 撤销DID
+	// 更新状态
 	doc.Status = "revoked"
-	doc.Updated = time.Now()
+	now := time.Now()
+	doc.Updated = &now
 	doc.Proof = proof
 
-	// TODO: 将DID撤销交易提交到区块链
-	log.Printf("撤销DID: %s", didStr)
+	// 提交DID撤销交易到区块链
+	if r.blockchain != nil {
+		tx, err := r.blockchain.RevokeDID(context.Background(), didStr, proof)
+		if err != nil {
+			log.Printf("区块链撤销失败，但继续内存撤销: %v", err)
+		} else {
+			log.Printf("DID撤销交易已提交到区块链: %s, 交易哈希: %s", didStr, tx.Hash)
+		}
+	} else {
+		log.Printf("仅内存撤销DID: %s", didStr)
+	}
 
 	return nil
 }
 
 // List 列出所有DID
-func (r *DIDRegistry) List() ([]*DIDDocument, error) {
+func (r *DIDRegistry) List() ([]*types.DIDDocument, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	docs := make([]*DIDDocument, 0, len(r.storage))
+	var docs []*types.DIDDocument
 	for _, doc := range r.storage {
 		docs = append(docs, doc)
 	}
@@ -234,42 +238,59 @@ func (r *DIDRegistry) List() ([]*DIDDocument, error) {
 
 // validateDID 验证DID格式
 func (r *DIDRegistry) validateDID(didStr string) error {
+	if didStr == "" {
+		return &DIDError{
+			Type:    ErrorTypeValidation,
+			Code:    "INVALID_DID_FORMAT",
+			Message: "DID不能为空",
+		}
+	}
+
 	if !strings.HasPrefix(didStr, "did:") {
-		return utils.NewErrorWithDetails(utils.ErrorTypeValidation, "INVALID_DID_PREFIX", 
-			"DID必须以'did:'开头", didStr)
+		return &DIDError{
+			Type:    ErrorTypeValidation,
+			Code:    "INVALID_DID_FORMAT",
+			Message: "DID必须以'did:'开头",
+		}
 	}
 
 	parts := strings.Split(didStr, ":")
 	if len(parts) < 3 {
-		return utils.NewErrorWithDetails(utils.ErrorTypeValidation, "INVALID_DID_FORMAT", 
-			"DID格式无效，至少需要3个部分", didStr)
-	}
-
-	// 验证方法名
-	method := parts[1]
-	if method != "qlink" {
-		return utils.NewErrorWithDetails(utils.ErrorTypeValidation, "UNSUPPORTED_DID_METHOD", 
-			"不支持的DID方法", method)
-	}
-
-	// 验证标识符
-	identifier := parts[2]
-	if len(identifier) == 0 {
-		return utils.NewErrorWithDetails(utils.ErrorTypeValidation, "EMPTY_DID_IDENTIFIER", 
-			"DID标识符不能为空", didStr)
+		return &DIDError{
+			Type:    ErrorTypeValidation,
+			Code:    "INVALID_DID_FORMAT",
+			Message: "DID格式无效，应为 did:method:identifier",
+		}
 	}
 
 	return nil
 }
 
-// ToJSON 将DID文档转换为JSON
-func (doc *DIDDocument) ToJSON() ([]byte, error) {
-	return json.MarshalIndent(doc, "", "  ")
+// FromJSON 从JSON创建DID文档
+func FromJSON(data []byte) (*types.DIDDocument, error) {
+	var doc types.DIDDocument
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	return &doc, nil
 }
 
-// FromJSON 从JSON创建DID文档
-func FromJSON(data []byte) (*DIDDocument, error) {
-	var doc DIDDocument
-	err := json.Unmarshal(data, &doc)
-	return &doc, err
+// DIDError DID错误类型
+type DIDError struct {
+	Type    string      `json:"type"`
+	Code    string      `json:"code"`
+	Message string      `json:"message"`
+	Details interface{} `json:"details,omitempty"`
 }
+
+func (e *DIDError) Error() string {
+	return e.Message
+}
+
+// 错误类型常量
+const (
+	ErrorTypeValidation = "validation"
+	ErrorTypeNotFound   = "not_found"
+	ErrorTypeConflict   = "conflict"
+	ErrorTypeBlockchain = "blockchain"
+)
