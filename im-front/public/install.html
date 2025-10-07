@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QLink 浏览器扩展安装指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .browser-selector {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .browser-selector h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .browser-tabs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .tab-btn:hover:not(.active) {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .install-section {
+            display: none;
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 16px;
+            margin: 20px 0;
+        }
+
+        .install-section.active {
+            display: block;
+        }
+
+        .install-section h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .steps {
+            counter-reset: step-counter;
+        }
+
+        .step {
+            counter-increment: step-counter;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+            position: relative;
+        }
+
+        .step::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: -15px;
+            top: 20px;
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .step h4 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .step p {
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        .step code {
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #495057;
+        }
+
+        .download-section {
+            text-align: center;
+            margin: 30px 0;
+            padding: 30px;
+            background: #e3f2fd;
+            border-radius: 16px;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 30px;
+            background: #4caf50;
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin: 10px;
+        }
+
+        .download-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .download-btn.secondary {
+            background: #2196f3;
+        }
+
+        .download-btn.secondary:hover {
+            background: #1976d2;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .warning h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .warning p {
+            color: #856404;
+            margin: 0;
+        }
+
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .success h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+
+        .success p {
+            color: #155724;
+            margin: 0;
+        }
+
+        .screenshot {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin: 15px 0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .browser-tabs {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .tab-btn {
+                width: 200px;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 QLink 浏览器扩展</h1>
+            <p>安装指南 - 让您的浏览体验更加便捷</p>
+        </div>
+
+        <div class="content">
+            <div class="download-section">
+                <h2>📥 下载扩展文件</h2>
+                <p>请先下载扩展文件，然后按照下面的步骤安装</p>
+                <a href="/plugin/qlink-extension.zip" class="download-btn" download>
+                    📦 下载 ZIP 包
+                </a>
+                <a href="#" class="download-btn secondary" onclick="downloadFolder()">
+                    📁 下载文件夹 (推荐)
+                </a>
+            </div>
+
+            <div class="browser-selector">
+                <h2>🌐 选择您的浏览器</h2>
+                <div class="browser-tabs">
+                    <button class="tab-btn active" onclick="showBrowser('chrome')">
+                        🟢 Chrome
+                    </button>
+                    <button class="tab-btn" onclick="showBrowser('edge')">
+                        🔵 Edge
+                    </button>
+                    <button class="tab-btn" onclick="showBrowser('firefox')">
+                        🟠 Firefox
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chrome/Edge 安装说明 -->
+            <div id="chrome-section" class="install-section active">
+                <h3>🟢 Chrome 浏览器安装步骤</h3>
+                
+                <div class="warning">
+                    <h4>⚠️ 重要提醒</h4>
+                    <p>Chrome 浏览器需要解压后的文件夹，不能直接安装 ZIP 文件。请确保先解压下载的文件。</p>
+                </div>
+
+                <div class="steps">
+                    <div class="step">
+                        <h4>解压文件</h4>
+                        <p>将下载的 <code>qlink-extension.zip</code> 解压到一个文件夹中，记住这个文件夹的位置。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>打开扩展管理页面</h4>
+                        <p>在 Chrome 浏览器中输入 <code>chrome://extensions/</code> 或者通过菜单：</p>
+                        <p>更多工具 → 扩展程序</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>启用开发者模式</h4>
+                        <p>在扩展管理页面右上角，打开"开发者模式"开关。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>加载扩展</h4>
+                        <p>点击"加载已解压的扩展程序"按钮，选择刚才解压的文件夹。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>确认安装</h4>
+                        <p>扩展安装成功后，您会在扩展列表中看到 QLink 扩展，并且浏览器工具栏会出现扩展图标。</p>
+                    </div>
+                </div>
+
+                <div class="success">
+                    <h4>✅ 安装完成</h4>
+                    <p>现在您可以使用 QLink 扩展了！点击工具栏中的扩展图标开始使用。</p>
+                </div>
+            </div>
+
+            <!-- Edge 安装说明 -->
+            <div id="edge-section" class="install-section">
+                <h3>🔵 Microsoft Edge 浏览器安装步骤</h3>
+                
+                <div class="warning">
+                    <h4>⚠️ 重要提醒</h4>
+                    <p>Edge 浏览器需要解压后的文件夹，不能直接安装 ZIP 文件。请确保先解压下载的文件。</p>
+                </div>
+
+                <div class="steps">
+                    <div class="step">
+                        <h4>解压文件</h4>
+                        <p>将下载的 <code>qlink-extension.zip</code> 解压到一个文件夹中，记住这个文件夹的位置。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>打开扩展管理页面</h4>
+                        <p>在 Edge 浏览器中输入 <code>edge://extensions/</code> 或者通过菜单：</p>
+                        <p>更多工具 → 扩展</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>启用开发者模式</h4>
+                        <p>在扩展管理页面左下角，打开"开发人员模式"开关。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>加载扩展</h4>
+                        <p>点击"加载解压缩的扩展"按钮，选择刚才解压的文件夹。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>确认安装</h4>
+                        <p>扩展安装成功后，您会在扩展列表中看到 QLink 扩展，并且浏览器工具栏会出现扩展图标。</p>
+                    </div>
+                </div>
+
+                <div class="success">
+                    <h4>✅ 安装完成</h4>
+                    <p>现在您可以使用 QLink 扩展了！点击工具栏中的扩展图标开始使用。</p>
+                </div>
+            </div>
+
+            <!-- Firefox 安装说明 -->
+            <div id="firefox-section" class="install-section">
+                <h3>🟠 Firefox 浏览器安装步骤</h3>
+                
+                <div class="warning">
+                    <h4>⚠️ 临时安装说明</h4>
+                    <p>Firefox 的临时安装在浏览器重启后会失效。如需永久安装，需要 Mozilla 签名。</p>
+                </div>
+
+                <div class="steps">
+                    <div class="step">
+                        <h4>打开调试页面</h4>
+                        <p>在 Firefox 浏览器中输入 <code>about:debugging</code></p>
+                    </div>
+
+                    <div class="step">
+                        <h4>选择此 Firefox</h4>
+                        <p>点击左侧的"此 Firefox"选项。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>加载临时附加组件</h4>
+                        <p>点击"加载临时附加组件"按钮。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>选择 manifest.json</h4>
+                        <p>浏览到解压的扩展文件夹，选择 <code>manifest.json</code> 文件。</p>
+                    </div>
+
+                    <div class="step">
+                        <h4>确认安装</h4>
+                        <p>扩展安装成功后，您会在临时扩展列表中看到 QLink 扩展。</p>
+                    </div>
+                </div>
+
+                <div class="success">
+                    <h4>✅ 临时安装完成</h4>
+                    <p>现在您可以使用 QLink 扩展了！注意：浏览器重启后需要重新安装。</p>
+                </div>
+            </div>
+
+            <div class="warning">
+                <h4>🔧 遇到问题？</h4>
+                <p>如果安装过程中遇到任何问题，请确保：</p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>已正确解压文件</li>
+                    <li>已启用开发者模式</li>
+                    <li>选择的是解压后的文件夹，不是 ZIP 文件</li>
+                    <li>文件夹中包含 manifest.json 文件</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showBrowser(browser) {
+            // 隐藏所有安装说明
+            document.querySelectorAll('.install-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // 移除所有按钮的激活状态
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // 显示选中的浏览器说明
+            document.getElementById(browser + '-section').classList.add('active');
+            
+            // 激活选中的按钮
+            event.target.classList.add('active');
+        }
+
+        function downloadFolder() {
+            // 创建一个新窗口显示文件夹内容
+            const folderWindow = window.open('', '_blank', 'width=800,height=600');
+            folderWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>QLink 扩展文件夹</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        .file-list { list-style: none; padding: 0; }
+                        .file-item { 
+                            padding: 10px; 
+                            border: 1px solid #ddd; 
+                            margin: 5px 0; 
+                            border-radius: 5px;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                        }
+                        .download-btn { 
+                            background: #4caf50; 
+                            color: white; 
+                            padding: 5px 15px; 
+                            text-decoration: none; 
+                            border-radius: 3px; 
+                        }
+                        .instructions {
+                            background: #f0f8ff;
+                            padding: 15px;
+                            border-radius: 8px;
+                            margin-bottom: 20px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>QLink 浏览器扩展文件</h1>
+                    <div class="instructions">
+                        <h3>📋 安装说明：</h3>
+                        <ol>
+                            <li>下载所有文件到同一个文件夹</li>
+                            <li>打开浏览器扩展管理页面</li>
+                            <li>启用开发者模式</li>
+                            <li>选择"加载已解压的扩展程序"</li>
+                            <li>选择包含这些文件的文件夹</li>
+                        </ol>
+                    </div>
+                    <ul class="file-list">
+                        <li class="file-item">
+                            <span>📄 manifest.json</span>
+                            <a href="/plugin/qlink-extension/manifest.json" class="download-btn" download>下载</a>
+                        </li>
+                        <li class="file-item">
+                            <span>📄 background.js</span>
+                            <a href="/plugin/qlink-extension/background.js" class="download-btn" download>下载</a>
+                        </li>
+                        <li class="file-item">
+                            <span>📄 content.js</span>
+                            <a href="/plugin/qlink-extension/content.js" class="download-btn" download>下载</a>
+                        </li>
+                        <li class="file-item">
+                            <span>📄 injected.js</span>
+                            <a href="/plugin/qlink-extension/injected.js" class="download-btn" download>下载</a>
+                        </li>
+                        <li class="file-item">
+                            <span>📄 popup.html</span>
+                            <a href="/plugin/qlink-extension/popup.html" class="download-btn" download>下载</a>
+                        </li>
+                        <li class="file-item">
+                            <span>📄 popup.js</span>
+                            <a href="/plugin/qlink-extension/popup.js" class="download-btn" download>下载</a>
+                        </li>
+                        <li class="file-item">
+                            <span>📄 popup.css</span>
+                            <a href="/plugin/qlink-extension/popup.css" class="download-btn" download>下载</a>
+                        </li>
+                        <li class="file-item">
+                            <span>🖼️ icon.svg</span>
+                            <a href="/plugin/qlink-extension/icons/icon.svg" class="download-btn" download>下载</a>
+                        </li>
+                    </ul>
+                    <p><strong>💡 提示：</strong> 建议右键点击"下载"按钮，选择"另存为"，将所有文件保存到同一个文件夹中。</p>
+                </body>
+                </html>
+            `);
+        }
+
+        // 检查插件是否安装
+        function checkPlugin() {
+            try {
+                if (window.qlink && window.qlink.isInstalled) {
+                    // 插件已安装，跳转到登录页面
+                    window.location.href = '/login';
+                    return true;
+                }
+                return false;
+            } catch (err) {
+                console.error('检查插件失败:', err);
+                return false;
+            }
+        }
+
+        // 页面加载时检查插件
+        document.addEventListener('DOMContentLoaded', function() {
+            // 立即检查一次
+            checkPlugin();
+            
+            // 每3秒检查一次插件状态
+            setInterval(checkPlugin, 3000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+启动 DID-QLink 节点...
+2025/10/06 23:32:06 检查API配置: didCfg.API=0xc0000ee3f0
+2025/10/06 23:32:06 didCfg API配置存在，Port=8080
+2025/10/06 23:32:06 准备启动API服务器...
+2025/10/06 23:32:06 API服务器创建成功: 0xc0000cea00
+2025/10/06 23:32:06 API服务器创建成功，准备启动...
+DID-QLink 节点已启动 (端口: 30300)
+API 服务地址: http://:8080
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /health                   --> github.com/qujing226/QLink/pkg/api.(*Server).healthCheck-fm (6 handlers)
+[GIN-debug] GET    /metrics                  --> github.com/qujing226/QLink/pkg/api.(*Server).setupRoutes.WrapH.func3 (6 handlers)
+[GIN-debug] GET    /api/v1/blockchain/blocks/:hash --> github.com/qujing226/QLink/pkg/api.(*Server).getBlock-fm (6 handlers)
+[GIN-debug] GET    /api/v1/blockchain/blocks/latest --> github.com/qujing226/QLink/pkg/api.(*Server).getLatestBlock-fm (6 handlers)
+[GIN-debug] GET    /api/v1/blockchain/height --> github.com/qujing226/QLink/pkg/api.(*Server).getBlockHeight-fm (6 handlers)
+[GIN-debug] GET    /api/v1/blockchain/transactions/:id --> github.com/qujing226/QLink/pkg/api.(*Server).getTransaction-fm (6 handlers)
+[GIN-debug] POST   /api/v1/blockchain/transactions --> github.com/qujing226/QLink/pkg/api.(*Server).submitTransaction-fm (6 handlers)
+[GIN-debug] GET    /api/v1/blockchain/txpool/stats --> github.com/qujing226/QLink/pkg/api.(*Server).getTxPoolStats-fm (6 handlers)
+[GIN-debug] POST   /api/v1/did/register      --> github.com/qujing226/QLink/pkg/api.(*Server).registerDID-fm (6 handlers)
+[GIN-debug] GET    /api/v1/did/resolve/:did  --> github.com/qujing226/QLink/pkg/api.(*Server).resolveDID-fm (6 handlers)
+[GIN-debug] PUT    /api/v1/did/update/:did   --> github.com/qujing226/QLink/pkg/api.(*Server).updateDID-fm (6 handlers)
+[GIN-debug] DELETE /api/v1/did/revoke/:did   --> github.com/qujing226/QLink/pkg/api.(*Server).revokeDID-fm (6 handlers)
+[GIN-debug] POST   /api/v1/did/generate      --> github.com/qujing226/QLink/pkg/api.(*Server).generateDID-fm (6 handlers)
+[GIN-debug] GET    /api/v1/did/list          --> github.com/qujing226/QLink/pkg/api.(*Server).listDIDs-fm (6 handlers)
+[GIN-debug] GET    /api/v1/did/:id/document  --> github.com/qujing226/QLink/pkg/api.(*Server).getDIDDocument-fm (6 handlers)
+[GIN-debug] GET    /api/v1/did/:id/lattice-key --> github.com/qujing226/QLink/pkg/api.(*Server).getLatticePublicKey-fm (6 handlers)
+[GIN-debug] POST   /api/v1/did/batch/register --> github.com/qujing226/QLink/pkg/api.(*Server).batchRegisterDID-fm (6 handlers)
+[GIN-debug] POST   /api/v1/did/batch/resolve --> github.com/qujing226/QLink/pkg/api.(*Server).batchResolveDID-fm (6 handlers)
+[GIN-debug] POST   /api/v1/auth/challenge    --> github.com/qujing226/QLink/pkg/api.(*Server).createChallenge-fm (6 handlers)
+[GIN-debug] POST   /api/v1/auth/login        --> github.com/qujing226/QLink/pkg/api.(*Server).loginWithDID-fm (6 handlers)
+[GIN-debug] POST   /api/v1/auth/verify       --> github.com/qujing226/QLink/pkg/api.(*Server).verifyToken-fm (6 handlers)
+[GIN-debug] GET    /api/v1/node/info         --> github.com/qujing226/QLink/pkg/api.(*Server).getNodeInfo-fm (6 handlers)
+[GIN-debug] GET    /api/v1/node/peers        --> github.com/qujing226/QLink/pkg/api.(*Server).getPeers-fm (6 handlers)
+[GIN-debug] POST   /api/v1/node/peers        --> github.com/qujing226/QLink/pkg/api.(*Server).addPeer-fm (6 handlers)
+[GIN-debug] DELETE /api/v1/node/peers/:id    --> github.com/qujing226/QLink/pkg/api.(*Server).removePeer-fm (6 handlers)
+[GIN-debug] GET    /api/v1/node/status       --> github.com/qujing226/QLink/pkg/api.(*Server).getNodeStatus-fm (6 handlers)
+[GIN-debug] GET    /api/v1/node/sync         --> github.com/qujing226/QLink/pkg/api.(*Server).getSyncStatus-fm (6 handlers)
+[GIN-debug] GET    /api/v1/cluster/status    --> github.com/qujing226/QLink/pkg/api.(*Server).getClusterStatus-fm (6 handlers)
+[GIN-debug] POST   /api/v1/cluster/sync      --> github.com/qujing226/QLink/pkg/api.(*Server).triggerSync-fm (6 handlers)
+[GIN-debug] GET    /api/v1/cluster/consensus --> github.com/qujing226/QLink/pkg/api.(*Server).getConsensusStatus-fm (6 handlers)
+2025/10/06 23:32:06 启动API服务器，监听地址: :8080
+2025/10/06 23:32:06 API 服务启动成功
+[GIN] 2025/10/06 - 23:38:21 | 200 |     405.339µs |       127.0.0.1 | POST     "/api/v1/auth/challenge"
