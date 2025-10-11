@@ -16,9 +16,8 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用程序
+# 构建应用程序（仅节点服务）
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o qlink-node ./cmd/qlink-node
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o qlink-cli ./cmd/qlink-cli
 
 # 使用轻量级的alpine镜像作为运行环境
 FROM alpine:latest
@@ -35,7 +34,6 @@ WORKDIR /home/qlink
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/qlink-node .
-COPY --from=builder /app/qlink-cli .
 
 # 创建配置和数据目录
 RUN mkdir -p config data logs && \
@@ -50,9 +48,10 @@ USER qlink
 # 暴露端口
 EXPOSE 8080 8081 9090
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD ./qlink-cli health || exit 1
+# 健康检查（移除CLI依赖）
+# 可根据需要改为 HTTP 探针，例如：
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD wget -qO- http://localhost:8080/health || exit 1
 
 # 启动命令
 CMD ["./qlink-node", "--config", "./config/config.yaml"]

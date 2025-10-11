@@ -1,40 +1,41 @@
 package api
 
 import (
-	"context"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
-	"strings"
-	"sync"
-	"time"
+    "context"
+    "crypto/ecdsa"
+    "crypto/hmac"
+    "crypto/rand"
+    "crypto/sha256"
+    "encoding/base64"
+    "encoding/hex"
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+    "strings"
+    "sync"
+    "time"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/qujing226/QLink/did"
-	"github.com/qujing226/QLink/did/blockchain"
-	"github.com/qujing226/QLink/did/crypto"
-	blockchainPkg "github.com/qujing226/QLink/pkg/blockchain"
-	"github.com/qujing226/QLink/pkg/config"
-	"github.com/qujing226/QLink/pkg/types"
+    "github.com/gin-contrib/cors"
+    "github.com/gin-gonic/gin"
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
+    "github.com/qujing226/QLink/did"
+    didcrypto "github.com/qujing226/QLink/did/crypto"
+    blockchainPkg "github.com/qujing226/QLink/pkg/blockchain"
+    "github.com/qujing226/QLink/pkg/config"
+    "github.com/qujing226/QLink/pkg/storage"
+    "github.com/qujing226/QLink/pkg/types"
 )
 
 // Server HTTP API服务器
 type Server struct {
-	config         *config.Config
-	server         *http.Server
-	storageManager *blockchain.StorageManager
-	registry       *did.DIDRegistry
-	resolver       *did.DIDResolver
-	blockchain     *blockchainPkg.Blockchain // 添加区块链实例
+    config         *config.Config
+    server         *http.Server
+    storageManager *storage.StorageManager
+    registry       *did.DIDRegistry
+    resolver       *did.DIDResolver
+    blockchain     *blockchainPkg.Blockchain // 添加区块链实例
 
 	// 分布式网络相关
 	nodeID     string
@@ -84,7 +85,7 @@ type LoginResponse struct {
 }
 
 // NewServer 创建新的API服务器
-func NewServer(cfg *config.Config, sm *blockchain.StorageManager, reg *did.DIDRegistry, res *did.DIDResolver, bc *blockchainPkg.Blockchain) *Server {
+func NewServer(cfg *config.Config, sm *storage.StorageManager, reg *did.DIDRegistry, res *did.DIDResolver, bc *blockchainPkg.Blockchain) *Server {
 	// 检查输入参数
 	if cfg == nil {
 		log.Printf("警告: NewServer收到空的配置参数")
@@ -208,12 +209,17 @@ func (s *Server) Stop() error {
 
 // setupRoutes 设置路由
 func (s *Server) setupRoutes(router *gin.Engine) {
-	// 设置CORS
-	config := cors.DefaultConfig()
-	config.AllowAllOrigins = true
-	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
-	config.AllowHeaders = []string{"*"}
-	router.Use(cors.New(config))
+    // 设置CORS
+    corsCfg := cors.DefaultConfig()
+    corsCfg.AllowAllOrigins = false
+    corsCfg.AllowOrigins = []string{
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+    corsCfg.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+    corsCfg.AllowHeaders = []string{"Content-Type", "Authorization"}
+    corsCfg.AllowCredentials = true
+    router.Use(cors.New(corsCfg))
 
 	// 添加监控中间件
 	router.Use(s.metricsMiddleware())
@@ -261,8 +267,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 		// 认证相关
 		auth := v1.Group("/auth")
 		{
-			auth.POST("/challenge", s.createChallenge)
-			auth.POST("/login", s.loginWithDID)
+			// 仅保留令牌验证端点，移除挑战与登录路由
 			auth.POST("/verify", s.verifyToken)
 		}
 
@@ -513,21 +518,21 @@ func (s *Server) registerDID(c *gin.Context) {
 
 // 解析DID
 func (s *Server) resolveDID(c *gin.Context) {
-	didID := c.Param("did")
-	if didID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "DID ID不能为空"})
-		return
-	}
+    didID := c.Param("did")
+    if didID == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "DID ID不能为空"})
+        return
+    }
 
-	// 构造完整的DID
-	fullDID := fmt.Sprintf("did:qlink:%s", didID)
+    // 使用传入的完整DID，不再拼接前缀
+    fullDID := didID
 
-	// 解析DID
-	result, err := s.resolver.Resolve(fullDID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("解析DID失败: %v", err)})
-		return
-	}
+    // 解析DID
+    result, err := s.resolver.Resolve(fullDID)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("解析DID失败: %v", err)})
+        return
+    }
 
 	c.JSON(http.StatusOK, gin.H{
 		"did_document":            result.DIDDocument,
@@ -661,14 +666,14 @@ func (s *Server) generateDID(c *gin.Context) {
 
 // getDIDDocument 获取DID文档
 func (s *Server) getDIDDocument(c *gin.Context) {
-	didID := c.Param("id")
-	if didID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "DID ID不能为空"})
-		return
-	}
+    didID := c.Param("id")
+    if didID == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "DID ID不能为空"})
+        return
+    }
 
-	// 构造完整的DID
-	fullDID := fmt.Sprintf("did:qlink:%s", didID)
+    // 使用传入的完整DID，不再拼接前缀
+    fullDID := didID
 
 	// 解析DID获取文档
 	document, err := s.registry.Resolve(fullDID)
@@ -682,14 +687,14 @@ func (s *Server) getDIDDocument(c *gin.Context) {
 
 // getLatticePublicKey 获取DID的格基公钥
 func (s *Server) getLatticePublicKey(c *gin.Context) {
-	didID := c.Param("id")
-	if didID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "DID ID不能为空"})
-		return
-	}
+    didID := c.Param("id")
+    if didID == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "DID ID不能为空"})
+        return
+    }
 
-	// 构造完整的DID
-	fullDID := fmt.Sprintf("did:qlink:%s", didID)
+    // 使用传入的完整DID，不再拼接前缀
+    fullDID := didID
 
 	// 解析DID获取文档
 	document, err := s.registry.Resolve(fullDID)
@@ -705,12 +710,12 @@ func (s *Server) getLatticePublicKey(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"did":         fullDID,
-		"lattice_key": latticeKey,
-		"type":        "Kyber768",
-		"format":      "JWK",
-	})
+    c.JSON(http.StatusOK, gin.H{
+        "did":         fullDID,
+        "lattice_key": latticeKey,
+        "type":        "none",
+        "format":      "none",
+    })
 }
 
 // extractLatticePublicKey 从DID文档中提取格基公钥
@@ -726,21 +731,10 @@ func (s *Server) extractLatticePublicKey(document *types.DIDDocument) (map[strin
 			return vm.PublicKeyLattice, nil
 		}
 
-		// 检查JWK中是否包含Kyber字段（兼容性处理）
-		if vm.PublicKeyJwk != nil {
-			if jwk, ok := vm.PublicKeyJwk.(map[string]interface{}); ok {
-				if kyberKey, exists := jwk["kyber"]; exists {
-					return map[string]interface{}{
-						"kty":   "OKP",
-						"crv":   "Kyber768",
-						"kyber": kyberKey,
-					}, nil
-				}
-			}
-		}
-	}
+        // 兼容性逻辑移除：不再从 JWK 提取 Kyber 字段
+    }
 
-	return nil, fmt.Errorf("未找到格基公钥")
+    return nil, fmt.Errorf("未找到格基公钥")
 }
 
 // validateDIDFormat 验证DID格式
@@ -810,7 +804,7 @@ func (s *Server) createChallenge(c *gin.Context) {
 
 // loginWithDID DID登录
 func (s *Server) loginWithDID(c *gin.Context) {
-	var req LoginRequest
+    var req LoginRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
@@ -839,24 +833,29 @@ func (s *Server) loginWithDID(c *gin.Context) {
 		return
 	}
 
-	// 验证DID是否存在
-	log.Printf("验证DID是否存在: %s", req.DID)
-	_, err := s.resolver.Resolve(req.DID)
-	if err != nil {
-		log.Printf("DID解析失败: %s, 错误: %v", req.DID, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "DID not found: " + err.Error()})
-		return
-	}
-	log.Printf("DID解析成功: %s", req.DID)
+    // 验证DID是否存在（必须检查解析结果是否包含文档）
+    log.Printf("验证DID是否存在: %s", req.DID)
+    res, err := s.resolver.Resolve(req.DID)
+    if err != nil {
+        log.Printf("DID解析失败: %s, 错误: %v", req.DID, err)
+        c.JSON(http.StatusBadRequest, gin.H{"error": "DID not found: " + err.Error()})
+        return
+    }
+    if res == nil || res.DIDDocument == nil {
+        log.Printf("DID解析结果为空或未找到文档: %s", req.DID)
+        c.JSON(http.StatusBadRequest, gin.H{"error": "DID not found"})
+        return
+    }
+    log.Printf("DID解析成功: %s", req.DID)
 
-	// 验证格基密码学签名
-	log.Printf("开始验证签名: DID=%s, 质询=%s, 签名=%s", req.DID, challenge.Challenge, req.Signature)
-	if !s.verifyLatticeSignature(req.Signature, challenge.Challenge, req.DID) {
-		log.Printf("签名验证失败")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid signature"})
-		return
-	}
-	log.Printf("签名验证成功")
+    // 验证ECDSA签名（前端以HybridSignature Base64(JSON)格式发送）
+    log.Printf("开始验证ECDSA签名: DID=%s, 质询=%s", req.DID, challenge.Challenge)
+    if !s.verifyECDSASignature(req.Signature, challenge.Challenge, req.DID) {
+        log.Printf("签名验证失败")
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid signature"})
+        return
+    }
+    log.Printf("签名验证成功")
 
 	// 生成会话令牌
 	tokenBytes := make([]byte, 32)
@@ -883,229 +882,139 @@ func (s *Server) loginWithDID(c *gin.Context) {
 
 // verifyLatticeSignature 验证格基密码学签名
 func (s *Server) verifyLatticeSignature(signature, challenge, did string) bool {
-	log.Printf("开始验证签名 - DID: %s", did)
-	log.Printf("签名内容: %s", signature)
-	log.Printf("质询内容: %s", challenge)
-	
-	// 尝试解析为JSON格式的HybridSignature
-	var hybridSig struct {
-		ECDSASignature string `json:"ecdsa_signature"`
-		KyberProof     string `json:"kyber_proof,omitempty"`
-	}
-	
-	// 首先尝试解析为JSON格式（真实签名）
-	if err := json.Unmarshal([]byte(signature), &hybridSig); err == nil {
-		log.Printf("解析为JSON格式成功，调用混合签名验证")
-		return s.verifyHybridSignature(&hybridSig, challenge, did)
-	}
-	
-	// 如果不是JSON格式，尝试解析为base64编码的签名
-	if sigBytes, err := base64.StdEncoding.DecodeString(signature); err == nil {
-		log.Printf("解码base64成功，尝试解析JSON")
-		if err := json.Unmarshal(sigBytes, &hybridSig); err == nil {
-			log.Printf("base64解码后解析JSON成功，调用混合签名验证")
-			return s.verifyHybridSignature(&hybridSig, challenge, did)
-		} else {
-			log.Printf("base64解码后解析JSON失败: %v", err)
-		}
-	} else {
-		log.Printf("base64解码失败: %v", err)
-	}
-	
-	// 如果不是JSON格式，尝试解析为hex编码的签名
-	if sigBytes, err := hex.DecodeString(signature); err == nil {
-		log.Printf("解码hex成功，尝试解析JSON")
-		if err := json.Unmarshal(sigBytes, &hybridSig); err == nil {
-			log.Printf("hex解码后解析JSON成功，调用混合签名验证")
-			return s.verifyHybridSignature(&hybridSig, challenge, did)
-		} else {
-			log.Printf("hex解码后解析JSON失败: %v", err)
-		}
-	} else {
-		log.Printf("hex解码失败: %v", err)
-	}
-	
-	// 回退到旧的模拟签名验证逻辑（向后兼容）
-	log.Printf("回退到旧的模拟签名验证逻辑")
-	return s.verifyLegacySignature(signature, challenge, did)
+    // 使用基于 DID 的派生密钥进行 HMAC-SHA256 验证
+    // HMAC方案已弃用，保留函数以兼容编译但始终返回false
+    return false
+}
+
+// verifyECDSASignature 验证前端发送的HybridSignature(JSON Base64)中的ECDSA签名
+func (s *Server) verifyECDSASignature(signatureB64JSON, challenge, did string) bool {
+    // 解码Base64 JSON
+    sigJSONBytes, err := base64.StdEncoding.DecodeString(signatureB64JSON)
+    if err != nil {
+        log.Printf("签名Base64解码失败: %v", err)
+        return false
+    }
+
+    // 解析JSON，提取ecdsa_signature
+    var sigPayload struct {
+        ECDSASignature string      `json:"ecdsa_signature"`
+        KyberProof     interface{} `json:"kyber_proof,omitempty"`
+    }
+    if err := json.Unmarshal(sigJSONBytes, &sigPayload); err != nil {
+        log.Printf("签名JSON解析失败: %v", err)
+        return false
+    }
+    if sigPayload.ECDSASignature == "" {
+        log.Printf("签名字段为空")
+        return false
+    }
+
+    // 解码DER ASN.1格式的ECDSA签名
+    ecdsaSig, err := base64.StdEncoding.DecodeString(sigPayload.ECDSASignature)
+    if err != nil {
+        log.Printf("ECDSA签名Base64解码失败: %v", err)
+        return false
+    }
+
+    // 获取DID文档，提取JWK公钥
+    var doc *types.DIDDocument
+    if d, err := s.registry.Resolve(did); err == nil {
+        doc = d
+    } else {
+        // 尝试通过解析器获取
+        if res, rerr := s.resolver.Resolve(did); rerr == nil && res != nil {
+            doc = res.DIDDocument
+        }
+    }
+    if doc == nil {
+        log.Printf("未找到DID文档: %s", did)
+        return false
+    }
+
+    // 查找JsonWebKey2020验证方法
+    var jwk didcrypto.PublicKeyJWK
+    found := false
+    for _, vm := range doc.VerificationMethod {
+        if vm.Type == "JsonWebKey2020" && vm.PublicKeyJwk != nil {
+            // 将interface{}转换为PublicKeyJWK
+            m, ok := vm.PublicKeyJwk.(map[string]interface{})
+            if !ok {
+                continue
+            }
+            // 提取必要字段
+            kty, _ := m["kty"].(string)
+            crv, _ := m["crv"].(string)
+            x, _ := m["x"].(string)
+            y, _ := m["y"].(string)
+            alg, _ := m["alg"].(string)
+            use, _ := m["use"].(string)
+            jwk = didcrypto.PublicKeyJWK{Kty: kty, Alg: alg, Use: use, Crv: crv, X: x, Y: y}
+            found = true
+            break
+        }
+    }
+    if !found {
+        log.Printf("DID文档中未找到JsonWebKey2020验证方法")
+        return false
+    }
+
+    // 从JWK构造ECDSA公钥
+    keyPair, err := didcrypto.FromJWK(&jwk)
+    if err != nil || keyPair == nil || keyPair.ECDSAPublicKey == nil {
+        log.Printf("从JWK构建公钥失败: %v", err)
+        return false
+    }
+
+    // 诊断：根据JWK计算指纹并校验与DID的一致性
+    if fp, fpErr := keyPair.GetFingerprint(); fpErr == nil && fp != "" {
+        expectedDID := "did:qlink:" + fp
+        if expectedDID != did {
+            log.Printf("DID与JWK指纹不一致: expected=%s, got=%s", expectedDID, did)
+        } else {
+            log.Printf("JWK指纹匹配DID: %s", did)
+        }
+    } else if fpErr != nil {
+        log.Printf("计算JWK指纹失败: %v", fpErr)
+    }
+
+    // 计算质询的SHA-256哈希
+    hash := sha256.Sum256([]byte(challenge))
+
+    // 验证ECDSA签名
+    if !ecdsa.VerifyASN1(keyPair.ECDSAPublicKey, hash[:], ecdsaSig) {
+        log.Printf("ECDSA签名验证失败: sig_len=%d, challenge_len=%d", len(ecdsaSig), len(challenge))
+        return false
+    }
+
+    return true
 }
 
 // verifyHybridSignature 验证真实的混合签名
 func (s *Server) verifyHybridSignature(sig *struct {
-	ECDSASignature string `json:"ecdsa_signature"`
-	KyberProof     string `json:"kyber_proof,omitempty"`
+    ECDSASignature string `json:"ecdsa_signature"`
+    KyberProof     string `json:"kyber_proof,omitempty"`
 }, challenge, did string) bool {
-	log.Printf("开始验证混合签名 - DID: %s", did)
-	log.Printf("质询内容: %s", challenge)
-	log.Printf("ECDSA签名: %s", sig.ECDSASignature)
-	
-	// 从DID文档中获取公钥
-	keyPair, err := s.getHybridKeyPairFromDID(did)
-	if err != nil {
-		log.Printf("获取DID密钥对失败: %v", err)
-		return false
-	}
-	
-	// 解码base64编码的ECDSA签名
-	ecdsaBytes, err := base64.StdEncoding.DecodeString(sig.ECDSASignature)
-	if err != nil {
-		log.Printf("解码ECDSA签名失败: %v", err)
-		return false
-	}
-	
-	log.Printf("解码后的ECDSA签名长度: %d bytes", len(ecdsaBytes))
-	log.Printf("解码后的ECDSA签名hex: %x", ecdsaBytes)
-	
-	// 解码Kyber证明（如果存在）
-	var kyberBytes []byte
-	if sig.KyberProof != "" {
-		kyberBytes, err = base64.StdEncoding.DecodeString(sig.KyberProof)
-		if err != nil {
-			log.Printf("解码Kyber证明失败: %v", err)
-			return false
-		}
-	}
-	
-	// 创建HybridSignature对象
-	hybridSignature := &crypto.HybridSignature{
-		ECDSASignature: ecdsaBytes,
-		KyberProof:     kyberBytes,
-	}
-	
-	// 使用真实的密码学验证
-	result := keyPair.Verify([]byte(challenge), hybridSignature)
-	log.Printf("混合签名验证结果: %v", result)
-	return result
+    // 简化：不再支持混合签名
+    return false
 }
 
 // getHybridKeyPairFromDID 从DID获取HybridKeyPair
-func (s *Server) getHybridKeyPairFromDID(did string) (*crypto.HybridKeyPair, error) {
-	// 解析DID文档
-	result, err := s.resolver.Resolve(did)
-	if err != nil {
-		return nil, fmt.Errorf("解析DID文档失败: %w", err)
-	}
-
-	if result.DIDDocument == nil {
-		return nil, fmt.Errorf("DID文档不存在")
-	}
-
-	// 从验证方法中获取公钥
-	if len(result.DIDDocument.VerificationMethod) == 0 {
-		return nil, fmt.Errorf("DID文档中没有验证方法")
-	}
-
-	// 使用第一个验证方法的公钥
-	vm := result.DIDDocument.VerificationMethod[0]
-	
-	// 从JWK中重建HybridKeyPair
-	if vm.PublicKeyJwk != nil {
-		// 类型断言为PublicKeyJWK
-		if jwk, ok := vm.PublicKeyJwk.(*crypto.PublicKeyJWK); ok {
-			return crypto.FromJWK(jwk)
-		}
-		// 如果类型断言失败，尝试从interface{}转换
-		jwkData, err := json.Marshal(vm.PublicKeyJwk)
-		if err != nil {
-			return nil, fmt.Errorf("序列化JWK失败: %w", err)
-		}
-		var jwk crypto.PublicKeyJWK
-		if err := json.Unmarshal(jwkData, &jwk); err != nil {
-			return nil, fmt.Errorf("反序列化JWK失败: %w", err)
-		}
-		return crypto.FromJWK(&jwk)
-	}
-
-	return nil, fmt.Errorf("无法从DID文档中提取公钥")
+func (s *Server) getHybridKeyPairFromDID(did string) (interface{}, error) {
+    // 简化：不再支持混合签名
+    return nil, fmt.Errorf("不再支持混合签名")
 }
 
 // verifyLegacySignature 验证旧的模拟签名格式（向后兼容）
 func (s *Server) verifyLegacySignature(signature, challenge, did string) bool {
-	// 检查签名是否为空或过短
-	if len(signature) < 20 {
-		return false
-	}
-	
-	// 检查签名是否以 'lattice_si' 开头
-	if !strings.HasPrefix(signature, "lattice_si") {
-		return false
-	}
-	
-	// 提取签名的各个部分
-	sigContent := signature[10:] // 去掉 'lattice_si' 前缀
-	
-	// 检查challenge前缀（前8位）
-	if len(sigContent) < 8 {
-		return false
-	}
-	
-	challengePrefix := sigContent[:8]
-	expectedChallengePrefix := challenge[:8]
-	
-	if challengePrefix != expectedChallengePrefix {
-		return false
-	}
-	
-	// 从DID文档中获取真实的公钥
-	publicKey, err := s.getPublicKeyFromDIDDocument(did)
-	if err != nil {
-		log.Printf("获取DID公钥失败: %v", err)
-		return false
-	}
-	
-	// 检查公钥后缀（最后8位）
-	if len(sigContent) < 16 {
-		return false
-	}
-	
-	publicKeySuffix := sigContent[len(sigContent)-8:]
-	expectedPublicKeySuffix := publicKey[len(publicKey)-8:]
-	
-	if publicKeySuffix != expectedPublicKeySuffix {
-		return false
-	}
-	
-	// 验证哈希部分
-	hashPart := sigContent[8 : len(sigContent)-8]
-	expectedHash := s.generateSignatureHash(challenge, publicKey)
-	
-	return hashPart == expectedHash
+    // 简化：不再支持旧版兼容签名
+    return false
 }
 
 // getPublicKeyFromDIDDocument 从DID文档中获取真实的公钥
 func (s *Server) getPublicKeyFromDIDDocument(did string) (string, error) {
-	// 解析DID文档
-	result, err := s.resolver.Resolve(did)
-	if err != nil {
-		return "", fmt.Errorf("解析DID文档失败: %w", err)
-	}
-
-	if result.DIDDocument == nil {
-		return "", fmt.Errorf("DID文档不存在")
-	}
-
-	// 从验证方法中获取公钥
-	if len(result.DIDDocument.VerificationMethod) == 0 {
-		return "", fmt.Errorf("DID文档中没有验证方法")
-	}
-
-	// 使用第一个验证方法的公钥
-	vm := result.DIDDocument.VerificationMethod[0]
-	
-	// 从JWK中提取公钥信息
-	if vm.PublicKeyJwk != nil {
-		// 这里需要根据实际的JWK格式来提取公钥
-		// 暂时返回一个基于DID的公钥
-		return s.generatePublicKeyFromDIDFallback(did), nil
-	}
-
-	// 如果没有JWK，使用其他公钥格式
-	if vm.PublicKeyMultibase != "" {
-		return vm.PublicKeyMultibase, nil
-	}
-
-	// 如果都没有，回退到基于DID生成公钥
-	return s.generatePublicKeyFromDIDFallback(did), nil
+    // 简化：直接回退基于DID生成的公钥
+    return s.generatePublicKeyFromDIDFallback(did), nil
 }
 
 // generatePublicKeyFromDIDFallback 从DID生成公钥的回退方法
@@ -1126,11 +1035,10 @@ func (s *Server) generatePublicKeyFromDIDFallback(did string) string {
 
 // generateSignatureHash 生成签名哈希
 func (s *Server) generateSignatureHash(challenge, publicKey string) string {
-	// 使用与前端相同的HMAC-SHA256算法
-	h := hmac.New(sha256.New, []byte(publicKey))
-	h.Write([]byte(challenge))
-	hash := h.Sum(nil)
-	return hex.EncodeToString(hash)[:16] // 取前16个字符
+    // 已简化方案不再使用此函数；保留以兼容编译
+    h := hmac.New(sha256.New, []byte(publicKey))
+    h.Write([]byte(challenge))
+    return hex.EncodeToString(h.Sum(nil))
 }
 
 // verifyToken 验证令牌

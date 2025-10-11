@@ -1,22 +1,22 @@
 package did
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"strings"
+    "encoding/json"
+    "fmt"
+    "log"
+    "strings"
 
-	"github.com/qujing226/QLink/did/blockchain"
-	"github.com/qujing226/QLink/pkg/config"
-	"github.com/qujing226/QLink/pkg/types"
-	"github.com/qujing226/QLink/pkg/utils"
+    "github.com/qujing226/QLink/pkg/config"
+    "github.com/qujing226/QLink/pkg/storage"
+    "github.com/qujing226/QLink/pkg/types"
+    "github.com/qujing226/QLink/pkg/utils"
 )
 
 // DIDResolver DID解析器
 type DIDResolver struct {
-	config   *config.Config
-	registry *DIDRegistry
-	storage  *blockchain.StorageManager
+    config   *config.Config
+    registry *DIDRegistry
+    storage  *storage.StorageManager
 }
 
 // ResolutionResult DID解析结果
@@ -40,12 +40,12 @@ type DocumentMetadata struct {
 }
 
 // NewDIDResolver 创建DID解析器
-func NewDIDResolver(cfg *config.Config, reg *DIDRegistry, storageManager *blockchain.StorageManager) *DIDResolver {
-	return &DIDResolver{
-		config:   cfg,
-		registry: reg,
-		storage:  storageManager,
-	}
+func NewDIDResolver(cfg *config.Config, reg *DIDRegistry, storageManager *storage.StorageManager) *DIDResolver {
+    return &DIDResolver{
+        config:   cfg,
+        registry: reg,
+        storage:  storageManager,
+    }
 }
 
 // Resolve 解析DID
@@ -194,24 +194,33 @@ func (r *DIDResolver) IsSupported(method string) bool {
 
 // resolveFromOffchain 从链下存储解析
 func (r *DIDResolver) resolveFromOffchain(didStr string) (*types.DIDDocument, error) {
-	if r.storage == nil {
-		return nil, fmt.Errorf("存储管理器未初始化")
-	}
+    if r.storage == nil {
+        return nil, fmt.Errorf("存储管理器未初始化")
+    }
 
-	// 构造存储键
-	storageKey := fmt.Sprintf("did:%s", didStr)
+    // 通过存储管理器获取DID存储
+    didStore, err := r.storage.GetDIDStorage()
+    if err != nil {
+        return nil, fmt.Errorf("获取DID存储失败: %w", err)
+    }
 
-	// 从存储中获取DID文档
-	data, err := r.storage.Get(storageKey)
-	if err != nil {
-		return nil, fmt.Errorf("从链下存储获取DID文档失败: %w", err)
-	}
+    // 从持久化存储读取文档
+    docIface, err := didStore.GetDIDDocument(didStr)
+    if err != nil {
+        return nil, fmt.Errorf("从链下存储获取DID文档失败: %w", err)
+    }
 
-	// 反序列化DID文档
-	var doc types.DIDDocument
-	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("反序列化DID文档失败: %w", err)
-	}
+    // 将通用对象转换为强类型DIDDocument
+    // 通过JSON编解码实现结构体转换
+    raw, err := json.Marshal(docIface)
+    if err != nil {
+        return nil, fmt.Errorf("序列化链下文档失败: %w", err)
+    }
 
-	return &doc, nil
+    var doc types.DIDDocument
+    if err := json.Unmarshal(raw, &doc); err != nil {
+        return nil, fmt.Errorf("反序列化DID文档失败: %w", err)
+    }
+
+    return &doc, nil
 }

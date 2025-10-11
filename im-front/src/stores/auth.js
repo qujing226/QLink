@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
 import { generateDID, validateDID, generateKeyPair, signData, generateChallenge, storeKey, getStoredKey, removeStoredKey } from '../utils/crypto'
+import { idbSet, idbGet, idbDelete, idbHydrateToLocalStorage } from '../utils/idb'
 
 const API_BASE = 'http://localhost:8082/api/v1'
 
@@ -12,6 +13,14 @@ export const useAuthStore = defineStore('auth', () => {
   const challenge = ref('')
   const challengeId = ref('')
   const keyPair = ref(null)
+
+  // 初始化时恢复用户信息（先尝试从IndexedDB回灌到localStorage）
+  idbHydrateToLocalStorage(['private_key', 'public_key', 'persisted_did']).then(() => {
+    const persistedDID = localStorage.getItem('qlink_key_persisted_did')
+    if (persistedDID && !localStorage.getItem('qlink_user')) {
+      user.value = { did: persistedDID }
+    }
+  })
 
   // 初始化时恢复用户信息
   if (token.value) {
@@ -29,6 +38,11 @@ export const useAuthStore = defineStore('auth', () => {
         publicKey: storedPublicKey
       }
     }
+
+    // 设置axios默认认证头，保证刷新后接口正常访问
+    try {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token.value}`
+    } catch {}
   }
 
   // 生成新的密钥对
@@ -37,6 +51,9 @@ export const useAuthStore = defineStore('auth', () => {
       keyPair.value = await generateKeyPair()
       storeKey('private_key', keyPair.value.privateKey)
       storeKey('public_key', keyPair.value.publicKey)
+      // 同步持久化到IndexedDB
+      await idbSet('private_key', keyPair.value.privateKey)
+      await idbSet('public_key', keyPair.value.publicKey)
       return keyPair.value
     } catch (error) {
       console.error('生成密钥对失败:', error)
@@ -49,7 +66,12 @@ export const useAuthStore = defineStore('auth', () => {
     if (!keyPair.value) {
       throw new Error('密钥对未生成')
     }
-    return generateDID(keyPair.value.publicKey)
+    const did = generateDID(keyPair.value.publicKey)
+    try {
+      localStorage.setItem('qlink_key_persisted_did', did)
+      idbSet('persisted_did', did)
+    } catch {}
+    return did
   }
 
   // 创建挑战（支持传入DID，否则使用本地密钥派生）
@@ -109,6 +131,8 @@ export const useAuthStore = defineStore('auth', () => {
       
       localStorage.setItem('qlink_token', newToken)
       localStorage.setItem('qlink_user', JSON.stringify(user.value))
+      // 在后端重启后可通过IndexedDB恢复登录身份
+      await idbSet('persisted_did', myDID)
       
       // 设置axios默认headers
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
@@ -148,6 +172,7 @@ export const useAuthStore = defineStore('auth', () => {
       
       localStorage.setItem('qlink_token', newToken)
       localStorage.setItem('qlink_user', JSON.stringify(userData))
+      await idbSet('persisted_did', did)
       
       // 设置axios默认headers
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
@@ -195,6 +220,9 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('qlink_user')
     removeStoredKey('private_key')
     removeStoredKey('public_key')
+    idbDelete('private_key')
+    idbDelete('public_key')
+    idbDelete('persisted_did')
     keyPair.value = null
     challenge.value = ''
     delete axios.defaults.headers.common['Authorization']

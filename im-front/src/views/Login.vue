@@ -191,7 +191,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { generateECDSASignature } from '@/utils/crypto'
+import { generateHMACSignature } from '@/utils/crypto'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -244,7 +244,7 @@ const checkPlugin = async (showError = true) => {
   }
 }
 
-// 使用插件登录
+// 使用插件登录（改为与后端一致的 HMAC-SHA256 签名）
 const loginWithPlugin = async () => {
   try {
     loggingIn.value = true
@@ -253,8 +253,8 @@ const loginWithPlugin = async () => {
     // 获取质询（统一使用 auth store）
     const challengeData = await getChallenge(userDID.value)
     
-    // 使用插件签名质询
-    const signature = await window.qlink.signChallenge(challengeData.challenge)
+    // 使用与后端一致的 HMAC-SHA256 方案签名质询
+    const signature = await generateHMACSignature(challengeData.challenge, userDID.value)
     
     // 验证签名并登录（由 auth store 完成持久化）
     const result = await verifySignature(userDID.value, challengeData, signature)
@@ -271,7 +271,7 @@ const loginWithPlugin = async () => {
   }
 }
 
-// DID手动登录
+// DID手动登录（改为与后端一致的 HMAC-SHA256 签名）
 const loginWithDID = async () => {
   try {
     loggingIn.value = true
@@ -286,8 +286,8 @@ const loginWithDID = async () => {
     // 获取质询（统一使用 auth store）
     const challengeData = await getChallenge(manualDID.value)
     
-    // 使用私钥签名质询
-    const signature = await signChallenge(challengeData.challenge, privateKey.value)
+    // 使用与后端一致的 HMAC-SHA256 方案签名质询
+    const signature = await signChallenge(challengeData.challenge, manualDID.value)
     
     // 验证签名并登录（由 auth store 完成持久化）
     const result = await verifySignature(manualDID.value, challengeData, signature)
@@ -304,10 +304,14 @@ const loginWithDID = async () => {
   }
 }
 
-// 获取质询
+// 获取质询：支持完整DID或仅标识段（自动补齐前缀）
 const getChallenge = async (did = null) => {
   try {
-    const targetDID = did || manualDID.value
+    let targetDID = (did || manualDID.value || '').trim()
+    // 如果只传入最后一段，则自动补齐前缀
+    if (targetDID && !targetDID.startsWith('did:')) {
+      targetDID = `did:qlink:${targetDID}`
+    }
     const resp = await authStore.createChallenge(targetDID)
     if (!resp.success) {
       throw new Error(resp.error || '获取质询失败')
@@ -333,32 +337,23 @@ const verifySignature = async (did, challengeData, signature) => {
   }
 }
 
-// 真实的ECDSA签名函数
-const signChallenge = async (challenge, privateKey) => {
+// 与后端一致的 HMAC-SHA256 签名函数
+const signChallenge = async (challenge, did) => {
   try {
     // 从challenge对象中提取nonce值
     const nonce = challenge.challenge || challenge
-    
-    // 使用crypto.js中的generateECDSASignature函数
-    const signature = await generateECDSASignatureLocal(nonce, privateKey)
+    // 基于 DID 的标识段派生密钥并做 HMAC-SHA256
+    const signature = await generateHMACSignature(nonce, did)
     return signature
-    
   } catch (error) {
     console.error('签名生成失败:', error)
     throw new Error('签名生成失败: ' + error.message)
   }
 }
 
-// 生成ECDSA签名
-const generateECDSASignatureLocal = async (message, privateKeyBase64) => {
-  try {
-    // 使用crypto.js中的generateECDSASignature函数
-    return await generateECDSASignature(message, privateKeyBase64)
-    
-  } catch (error) {
-    console.error('ECDSA签名失败:', error)
-    throw new Error('ECDSA签名失败: ' + error.message)
-  }
+// 保留占位：若未来需要切换回真实ECDSA，可在此实现
+const generateECDSASignatureLocal = async () => {
+  throw new Error('当前登录流程使用HMAC-SHA256，不再生成ECDSA签名')
 }
 
 // 辅助函数：base64转ArrayBuffer
@@ -381,9 +376,17 @@ const arrayBufferToBase64 = (buffer) => {
   return btoa(binary)
 }
 
-// 验证DID格式
-const isValidDID = (did) => {
-  return did && did.startsWith('did:qlink:') && did.length > 15
+// 验证DID格式：允许完整DID或仅最后一段；最后一段需>8字符
+const isValidDID = (input) => {
+  if (!input) return false
+  const did = input.trim()
+  if (did.startsWith('did:')) {
+    const parts = did.split(':')
+    const last = parts[parts.length - 1]
+    return parts.length >= 3 && last && last.length > 8
+  }
+  // 仅传入标识段
+  return did.length > 8
 }
 
 // 跳转到注册页面

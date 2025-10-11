@@ -23,10 +23,10 @@
       
       <div class="conversations-list">
         <div 
-          v-for="conv in filteredConversations" 
+          v-for="conv in filteredSidebarEntries" 
           :key="conv.participant_did"
-          @click="selectConversation(conv)"
-          :class="['conversation-item', { active: selectedConversation?.participant_did === conv.participant_did }]"
+          @click="selectConversationByDid(conv.participant_did)"
+          :class="['conversation-item', { active: selectedConversation && selectedConversation.participant_did === conv.participant_did }]"
         >
           <div class="conversation-avatar">
             <div class="avatar-circle">
@@ -52,22 +52,15 @@
 
     <!-- 聊天区域 -->
     <div class="chat-area">
-      <div v-if="!selectedConversation" class="no-conversation">
+      <!-- 空状态：没有任何会话或好友时，给出提示与入口 -->
+      <div v-if="!selectedConversation && !hasSidebarEntries" class="welcome-screen">
         <div class="welcome-content">
-          <div class="welcome-icon">
-            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
-          <h3>选择会话开始聊天</h3>
-          <button @click="$router.push('/friends')" class="start-chat-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-            </svg>
-            新建聊天
-          </button>
+          <p>开始聊天：在左侧添加或选择好友</p>
+          <button class="welcome-cta" @click="showAddFriendModal = true">添加好友</button>
         </div>
       </div>
+      <!-- 无选择时的纯背景 -->
+      <div v-else-if="!selectedConversation" class="empty-chat"></div>
       
       <div v-else class="conversation-view">
         <!-- 聊天头部 -->
@@ -106,7 +99,7 @@
           <div 
             v-for="message in messages" 
             :key="message.id"
-            :class="['message-wrapper', { 'own': message.sender_did === authStore.user?.did }]"
+            :class="['message-wrapper', { 'own': message.sender_did === (authStore.user ? authStore.user.did : '') }]"
           >
             <div class="message-bubble">
               <div class="message-content">{{ message.content }}</div>
@@ -173,8 +166,8 @@
             <input id="aliceKey" v-model="alicePrivateKey" type="text" placeholder="Kyber768私钥（base64）" class="did-input" />
           </div>
 
-          <div v-if="(messagesStore.pendingExchanges?.value || []).length" class="pending-list">
-            <div v-for="ex in messagesStore.pendingExchanges.value" :key="ex.id" class="exchange-item">
+          <div v-if="messagesStore.pendingExchanges && messagesStore.pendingExchanges.value && messagesStore.pendingExchanges.value.length" class="pending-list">
+            <div v-for="ex in (messagesStore.pendingExchanges ? messagesStore.pendingExchanges.value : [])" :key="ex.id" class="exchange-item">
               <div class="exchange-info">
                 <div class="exchange-from">来自：{{ formatDID(ex.from) }}</div>
                 <div class="exchange-ct">密文：<code>{{ ex.ciphertext.substring(0, 24) }}...</code></div>
@@ -237,7 +230,7 @@
               <button 
                 @click="addFriend" 
                 :disabled="adding"
-                class="add-friend-btn"
+                class="confirm-add-btn"
               >
                 <svg v-if="!adding" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
@@ -285,6 +278,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useMessagesStore } from '../stores/messages'
 import { useFriendsStore } from '../stores/friends'
+import { storeToRefs } from 'pinia'
 import axios from 'axios'
 const API_BASE = 'http://localhost:8082/api/v1'
 
@@ -313,15 +307,54 @@ const searching = ref(false)
 const adding = ref(false)
 const searchResult = ref(null)
 
-const { conversations, messages } = messagesStore
+// 使用 storeToRefs 保持响应式引用，避免解构丢失 .value
+const { conversations, messages } = storeToRefs(messagesStore)
 
-// 过滤会话列表
-const filteredConversations = computed(() => {
-  if (!searchQuery.value) return conversations.value
-  return conversations.value.filter(conv => 
-    conv.participant_did.toLowerCase().includes(searchQuery.value.toLowerCase())
+// 左侧列表：融合好友与会话，参考 Telegram 左侧栏
+const sidebarEntries = computed(() => {
+  const map = new Map()
+  // 先放入会话信息（防御性处理，确保为数组）
+  const convList = Array.isArray(conversations.value) ? conversations.value : []
+  for (const c of convList) {
+    map.set(c.participant_did, {
+      participant_did: c.participant_did,
+      online: !!c.online,
+      last_message: c.last_message || '',
+      updated_at: c.updated_at || 0
+    })
+  }
+  // 再合并好友（如果没有对应会话也展示出来）
+  const friendsList = (friendsStore.friends && Array.isArray(friendsStore.friends.value)) ? friendsStore.friends.value : []
+  for (const f of friendsList) {
+    const did = f.friend_did || f.did || f.participant_did || (typeof f === 'string' ? f : '')
+    if (!did) continue
+    if (!map.has(did)) {
+      map.set(did, {
+        participant_did: did,
+        online: !!f.online,
+        last_message: '',
+        updated_at: 0
+      })
+    } else {
+      // 合并在线状态
+      const prev = map.get(did)
+      map.set(did, { ...prev, online: prev.online || !!f.online })
+    }
+  }
+  // 排序：按更新时间倒序
+  return Array.from(map.values()).sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))
+})
+
+// 过滤左侧列表
+const filteredSidebarEntries = computed(() => {
+  if (!searchQuery.value) return sidebarEntries.value
+  return sidebarEntries.value.filter(conv => 
+    (conv.participant_did || '').toLowerCase().includes(searchQuery.value.toLowerCase())
   )
 })
+
+// 是否存在侧边列表条目（好友或会话）
+const hasSidebarEntries = computed(() => filteredSidebarEntries.value.length > 0)
 
 // 格式化DID显示
 const formatDID = (did) => {
@@ -332,10 +365,15 @@ const formatDID = (did) => {
   return did
 }
 
-// 获取头像文字
+// 获取头像文字（防御性处理，避免短字符串异常）
 const getAvatarText = (did) => {
-  if (!did) return 'U'
-  return did.substring(4, 6).toUpperCase()
+  if (!did || typeof did !== 'string') return 'U'
+  // 优先使用标识符部分（did:method:identifier）
+  const parts = did.split(':')
+  const ident = parts.length > 2 ? parts[parts.length - 1] : did
+  const trimmed = ident.trim()
+  if (!trimmed) return 'U'
+  return trimmed.slice(0, 2).toUpperCase()
 }
 
 // 格式化消息时间
@@ -350,31 +388,73 @@ const formatMessageTime = (timestamp) => {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
+// 初始化加载好友与会话列表，并根据参数或第一项进行选择
+const loadConversations = async () => {
+  try {
+    error.value = ''
+
+    // 临时放开鉴权以便预览，即使未登录也继续加载空列表
+
+    // 拉取好友与会话数据
+    await friendsStore.getFriends()
+    await messagesStore.getConversations()
+
+    // 如果URL中有 friend 参数，自动选择或创建会话
+    const friendParam = route.query?.friend
+    if (friendParam) {
+      let conv = conversations.value.find(c => c.participant_did === friendParam)
+      if (!conv) {
+        const created = await messagesStore.createConversation(friendParam)
+        if (created?.success) {
+          await messagesStore.getConversations()
+          conv = conversations.value.find(c => c.participant_did === friendParam)
+        }
+      }
+      if (conv) {
+        await selectConversation(conv)
+        return
+      }
+    }
+
+    // 如果URL带有 did 查询参数，优先选中该会话
+    const didParam = route.query?.did
+    if (didParam) {
+      await selectConversationByDid(didParam)
+      return
+    }
+
+    // 默认选中第一个会话，提升首屏可见性（防御性处理）
+    const convArr = Array.isArray(messagesStore.conversations.value)
+      ? messagesStore.conversations.value
+      : []
+    const first = convArr.length > 0 ? convArr[0] : null
+    if (first) {
+      await selectConversation(first)
+    }
+  } catch (e) {
+    console.error('加载会话失败:', e)
+    error.value = e.message || '加载会话失败'
+  }
+}
+
 const isEncrypted = computed(() => {
   return selectedConversation.value?.encrypted || false
 })
 
-const loadConversations = async () => {
-  await messagesStore.getConversations()
-  
-  // 如果URL中有friend参数，自动选择或创建会话
-  const friendDID = route.query.friend
-  if (friendDID) {
-    let conversation = conversations.value.find(c => c.participant_did === friendDID)
-    if (!conversation) {
-      // 创建新会话
-      const result = await messagesStore.createConversation(friendDID)
-      if (result.success) {
-        conversation = result.conversation
-        await messagesStore.getConversations() // 重新加载会话列表
-      }
-    }
-    if (conversation) {
-      selectConversation(conversation)
+// 通过 DID 选择或创建会话
+const selectConversationByDid = async (did) => {
+  let conversation = conversations.value.find(c => c.participant_did === did)
+  if (!conversation) {
+    const result = await messagesStore.createConversation(did)
+    if (result.success) {
+      await messagesStore.getConversations()
+      conversation = conversations.value.find(c => c.participant_did === did)
     }
   }
+  if (conversation) {
+    await selectConversation(conversation)
+  }
 }
-
 const selectConversation = async (conversation) => {
   selectedConversation.value = conversation
   // 按后端规范使用 friend_did 拉取消息
@@ -383,7 +463,8 @@ const selectConversation = async (conversation) => {
   // 标记对方发来的消息为已读
   try {
     const myDid = authStore.user?.did
-    for (const msg of messagesStore.messages.value) {
+    const msgList = Array.isArray(messages.value) ? messages.value : []
+    for (const msg of msgList) {
       if (msg.sender_did !== myDid && msg.status !== 'read') {
         await messagesStore.markAsRead(msg.id)
       }
@@ -598,31 +679,33 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+:root { --brand-1: #667eea; --brand-2: #764ba2; }
 .chat-container {
   display: flex;
-  height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+  min-height: 100vh;
+  background: #f6f7fb;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.sidebar.conversations-panel {
-  width: 380px;
-  background: white;
+.conversations-panel {
+  width: 300px;
+  background: #fff;
   border-right: 1px solid #e1e5e9;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border-radius: 0 12px 12px 0;
+  box-shadow: none;
+  border-radius: 0;
 }
 
 .panel-header {
-  padding: 20px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
+  padding: 10px;
+  background: #fff;
+  color: #333;
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
   align-items: center;
-  border-radius: 0 12px 0 0;
+  justify-content: space-between;
+  border-bottom: 1px solid #e1e8ed;
 }
 
 .sidebar-header h2 {
@@ -632,48 +715,52 @@ onUnmounted(() => {
 }
 
 .add-friend-btn {
-  background: rgba(255, 255, 255, 0.2);
+  background: #0088cc;
   border: none;
-  border-radius: 10px;
-  width: 40px;
-  height: 40px;
-  color: white;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s ease;
 }
 
 .add-friend-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: #0077b3;
 }
 
 .search-container {
-  padding: 16px 20px;
-  background: white;
-  border-bottom: 1px solid #e1e8ed;
+  position: relative;
+  flex: 1;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8b8b8b;
 }
 
 .search-input {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e1e5e9;
-  border-radius: 10px;
+  height: 32px;
+  padding: 0 12px 0 36px;
+  border: 1px solid #e1e5e9;
+  border-radius: 16px;
   background: #f8f9fa;
   font-size: 14px;
   outline: none;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   box-sizing: border-box;
 }
 
 .search-input:focus {
-  background: white;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: #fff;
+  border-color: #0088cc;
 }
 
 .conversations-list {
@@ -696,7 +783,7 @@ onUnmounted(() => {
 }
 
 .conversation-item.active {
-  background: #e3f2fd;
+  background: #eaf5ff;
 }
 
 .conversation-item.active::after {
@@ -706,14 +793,14 @@ onUnmounted(() => {
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
 }
 
 .conversation-avatar {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -770,7 +857,7 @@ onUnmounted(() => {
 }
 
 .unread-badge {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
   color: white;
   border-radius: 12px;
   padding: 2px 8px;
@@ -788,15 +875,41 @@ onUnmounted(() => {
   background: white;
 }
 
+/* Flex scroll fixes: allow children to shrink for scrollable areas */
+.conversations-panel,
+.chat-area {
+  min-height: 0;
+}
+
+.conversations-list,
+.messages-container {
+  min-height: 0;
+}
+
 .welcome-screen {
+  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: #8b8b8b;
+}
+.welcome-content {
   text-align: center;
-  padding: 40px;
+  color: #666;
+}
+.welcome-cta {
+  margin-top: 12px;
+  background: #0088cc;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.welcome-cta:hover { background: #0077b3; }
+/* 无选择时的干净背景 */
+.empty-chat {
+  flex: 1;
+  background: linear-gradient(135deg, #f5f7fa, #e9eff5);
 }
 
 .welcome-screen svg {
@@ -833,7 +946,7 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -939,7 +1052,7 @@ onUnmounted(() => {
 }
 
 .message-wrapper.own .message-content {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
   color: white;
 }
 
@@ -1227,9 +1340,9 @@ onUnmounted(() => {
   color: #8b8b8b;
 }
 
-.add-friend-btn {
+.confirm-add-btn {
   padding: 8px 16px;
-  background: #28a745;
+  background: #0088cc;
   color: white;
   border: none;
   border-radius: 6px;
@@ -1242,11 +1355,11 @@ onUnmounted(() => {
   transition: background-color 0.2s;
 }
 
-.add-friend-btn:hover:not(:disabled) {
-  background: #218838;
+.confirm-add-btn:hover:not(:disabled) {
+  background: #0077b3;
 }
 
-.add-friend-btn:disabled {
+.confirm-add-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1307,63 +1420,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-/* 欢迎页面样式 */
-.no-conversation {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-}
-
-.welcome-content {
-  text-align: center;
-  padding: 60px 40px;
-  max-width: 400px;
-}
-
-.welcome-icon {
-  margin-bottom: 32px;
-  color: #6c7b7f;
-}
-
-.welcome-content h3 {
-  margin: 0 0 32px 0;
-  color: #2c3e50;
-  font-size: 24px;
-  font-weight: 300;
-  letter-spacing: -0.5px;
-}
-
-.start-chat-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 14px 28px;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.start-chat-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-}
-
-.start-chat-btn:active {
-  transform: translateY(0);
-}
-
-.welcome-content p {
-  margin: 0;
-  font-size: 14px;
-}
+/* 移除欢迎文案相关样式，保持主区域简洁 */
 
 /* 密钥交换中心样式 */
 .pending-badge {
@@ -1554,7 +1611,7 @@ onUnmounted(() => {
 }
 
 .message-wrapper.own .message-content {
-  background: #54a3ff;
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
   color: white;
 }
 
@@ -1610,7 +1667,7 @@ onUnmounted(() => {
 }
 
 .input-wrapper:focus-within {
-  border-color: #54a3ff;
+  border-color: #667eea;
   background: white;
 }
 
@@ -1643,7 +1700,7 @@ onUnmounted(() => {
 }
 
 .send-btn {
-  background: #54a3ff;
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
   border: none;
   border-radius: 50%;
   width: 40px;
@@ -1653,11 +1710,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.2s;
 }
 
 .send-btn:hover:not(:disabled) {
-  background: #4a92e8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .send-btn:disabled {

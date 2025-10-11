@@ -133,11 +133,11 @@ type DIDConfig struct {
 
 // StorageConfig 存储配置
 type StorageConfig struct {
-	Type  string              `json:"type" yaml:"type"` // "local", "leveldb", "ipfs", "memory"
-	Path  string              `json:"path" yaml:"path"`
-	Sync  bool                `json:"sync" yaml:"sync"`
-	Local *LocalStorageConfig `json:"local,omitempty" yaml:"local,omitempty"`
-	IPFS  *IPFSStorageConfig  `json:"ipfs,omitempty" yaml:"ipfs,omitempty"`
+    Type  string              `json:"type" yaml:"type"` // 可选: "local", "leveldb", "ipfs"
+    Path  string              `json:"path" yaml:"path"`
+    Sync  bool                `json:"sync" yaml:"sync"`
+    Local *LocalStorageConfig `json:"local,omitempty" yaml:"local,omitempty"`
+    IPFS  *IPFSStorageConfig  `json:"ipfs,omitempty" yaml:"ipfs,omitempty"`
 }
 
 // LocalStorageConfig 本地存储配置

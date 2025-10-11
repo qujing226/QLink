@@ -21,16 +21,16 @@
 
 ## 核心组件
 
-### 文件结构
+### 文件结构（已更新）
 ```
-consensus/
-├── raft.go              # Raft共识算法实现
-├── poa.go               # PoA共识算法实现
-├── monitoring.go        # 监控和故障恢复
-├── switcher.go          # 共识算法切换器
-├── integration.go       # 共识管理器集成
-├── example.go           # 使用示例
-└── README.md           # 本文档
+pkg/consensus/
+├── raft.go                 # Raft 共识节点实现 (RaftNode)
+├── poa.go                  # PoA 共识节点实现 (PoANode)
+├── switcher.go             # 共识算法切换器 (ConsensusSwitcher)
+├── integration.go          # 共识管理器 (ConsensusManager)
+├── consensus_integration.go# 与 DID / 网络的集成器
+├── monitoring.go           # 监控与故障恢复
+└── README.md               # 本文档
 ```
 
 ### 主要结构体
@@ -63,15 +63,20 @@ type ConsensusMonitor struct {
 ```go
 type ConsensusSwitcher struct {
     config           *SwitcherConfig
-    currentConsensus ConsensusAlgorithm
-    algorithms       map[ConsensusType]ConsensusAlgorithm
+    currentConsensus interfaces.ConsensusAlgorithm
+    currentType      ConsensusType
+    // 直接持有具体节点实例（不再使用适配器集合）
+    raftNode         *RaftNode
+    poaNode          *PoANode
     // ...
 }
 ```
 
+说明：切换器通过 `Initialize(raftNode, poaNode, monitor)` 接收具体实现，并在运行时通过 `SwitchTo(ConsensusType)` 在两者间切换。
+
 ## 使用方法
 
-### 1. 基本使用
+### 1. 基本使用（直接节点，无适配器）
 ```go
 // 创建配置
 config := &ManagerConfig{
@@ -87,7 +92,7 @@ config := &ManagerConfig{
     },
 }
 
-// 创建管理器
+// 创建管理器（内部将直接管理 RaftNode 与 PoANode）
 manager := NewConsensusManager(config)
 
 // 启动
@@ -97,12 +102,9 @@ if err != nil {
     log.Fatal(err)
 }
 
-// 提交提案
-proposal := &Proposal{
-    Type: ProposalTypeDIDCreate,
-    Data: didOperation,
-}
-err = manager.SubmitProposal(proposal)
+// 提交提案（通过当前共识节点实现）
+proposal := map[string]interface{}{"type":"did_create","data":didOperation}
+err = manager.Submit(proposal)
 ```
 
 ### 2. 监控使用
@@ -122,7 +124,7 @@ for _, failure := range failures {
 
 ### 3. 算法切换
 ```go
-// 手动切换到PoA
+// 手动切换到 PoA
 err := manager.SwitchConsensus(ConsensusTypePoA)
 if err != nil {
     log.Printf("切换失败: %v", err)
@@ -132,6 +134,14 @@ if err != nil {
 currentType := manager.GetCurrentConsensusType()
 log.Printf("当前共识算法: %v", currentType)
 ```
+
+## 适配器弃用说明
+
+本模块已移除历史上的 `RaftAdapter`、`PoAAdapter`、`ConsensusSwitcherAdapter` 等适配层使用，统一改为直接使用：
+- `RaftNode` / `PoANode`：具体共识节点实现，提供 `Start/Stop/Submit/GetStatus/GetNodes` 等方法
+- `ConsensusSwitcher`：接受上述节点实例进行切换管理，当前活跃算法类型为 `ConsensusType`，实例类型为 `interfaces.ConsensusAlgorithm`
+
+如果你在自定义代码或文档中仍引用旧的适配器类型，请替换为上述直接节点与切换器 API。示例测试也已更新，参考 `pkg/consensus/consensus_test.go` 与 `pkg/consensus/integration_test.go`。
 
 ## 配置说明
 

@@ -4,502 +4,418 @@
     <header class="portal-header">
       <div class="header-content">
         <div class="logo">
-          <span class="logo-icon">🔗</span>
-          <h1>QLink 区块链身份门户</h1>
+          <h1>QLink</h1>
         </div>
-        <nav class="nav-menu">
-          <button 
-            v-for="tab in tabs" 
-            :key="tab.id"
-            :class="['nav-tab', { active: activeTab === tab.id }]"
-            @click="activeTab = tab.id"
-          >
-            <span class="tab-icon">{{ tab.icon }}</span>
-            {{ tab.name }}
-          </button>
-        </nav>
-        <button class="back-btn" @click="goBack">
-          <span>←</span> 返回登录
-        </button>
+        <!-- 顶部按钮组：与标题同排，分屏切换 -->
+        <div class="header-actions nav-menu">
+          <button class="nav-tab" :class="{ active: activeSection === 'home' }" @click="goSection('home')">概览</button>
+          <button class="nav-tab" :class="{ active: activeSection === 'register' }" @click="goSection('register')">注册</button>
+          <button class="nav-tab" :class="{ active: activeSection === 'query' }" @click="goSection('query')">查询</button>
+          <button class="nav-tab" :class="{ active: activeSection === 'manage' }" @click="goSection('manage')">管理</button>
+        </div>
       </div>
     </header>
 
     <!-- 主要内容区域 -->
     <main class="portal-main">
       <div class="container">
+        <!-- 页面级简要介绍（置于标题栏下、首页横幅之上） -->
+        <div class="page-lead">QLink：以自我主权身份为核心的可信网络。</div>
+        <!-- 首页 -->
+        <section id="home" class="tab-content home-section full-screen full-bleed">
+          <div class="hero-banner" :style="{ opacity: heroOpacity, transform: 'translateY(' + heroTranslateY + 'px)' }">
+            <div class="hero-overlay">
+              <div class="hero-grid">
+                <div class="hero-copy">
+                  <h2 class="hero-title">欢迎来到 QLink</h2>
+                  <p class="hero-subtitle">以自我主权身份为核心的可信网络</p>
+                  <div class="hero-description">
+                    <p>
+                      采用可验证凭证与隐私保护证明，最小披露而可证明可信，助力在零信任环境中完成授权、协作与合规。
+                    </p>
+                    <p>
+                      量子抗性与现代密码学并行的安全架构，让身份在不同系统间优雅迁移，同时保留对数据的最终控制权。
+                    </p>
+                  </div>
+                </div>
+                <div class="hero-actions-grid">
+                  <button class="btn btn-primary" @click="goSection('register')">开始注册</button>
+                  <button class="btn btn-secondary" @click="goSection('query')">查询DID</button>
+                  <button class="btn btn-secondary" @click="goSection('manage')">管理身份</button>
+                  <button class="btn btn-secondary" @click="contactUs">联系我们</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
         <!-- DID注册 -->
-        <div v-if="activeTab === 'register'" class="tab-content">
-          <div class="section-header">
-            <h2>🆔 DID身份注册</h2>
-            <p>创建您的去中心化身份标识符</p>
-          </div>
-          
-          <div class="register-form">
-            <div class="form-group">
-              <label>选择DID类型</label>
-              <select v-model="registerForm.didType" class="form-select">
-                <option value="did:qlink">did:qlink (推荐)</option>
-                <option value="did:ethr">did:ethr (以太坊)</option>
-                <option value="did:key">did:key (密钥)</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>身份标识符 (可选)</label>
-              <input 
-                v-model="registerForm.identifier" 
-                type="text" 
-                class="form-input"
-                placeholder="留空将自动生成"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>描述信息 (可选)</label>
-              <textarea 
-                v-model="registerForm.description" 
-                class="form-textarea"
-                placeholder="为您的DID添加描述信息"
-                rows="3"
-              ></textarea>
-            </div>
-
-            <div class="form-actions">
-              <button 
-                class="btn btn-primary" 
-                @click="registerDID"
-                :disabled="registering"
-              >
-                <span v-if="registering">⏳</span>
-                <span v-else>🔐</span>
-                {{ registering ? '注册中...' : '生成DID身份' }}
-              </button>
-            </div>
-
-            <!-- 注册结果 -->
-            <div v-if="registerResult" class="register-result">
-              <h3>✅ 注册成功！</h3>
-              <div class="result-item">
-                <label>DID标识符:</label>
-                <div class="result-value">
-                  <code>{{ registerResult.did }}</code>
-                  <button @click="copyToClipboard(registerResult.did)" class="copy-btn">📋</button>
-                </div>
+        <section id="register" class="tab-content full-screen gradient-section">
+          <div class="two-col">
+            <div class="col-left form-card">
+              <div class="section-header">
+                <h2>DID身份注册</h2>
+                <p>创建您的去中心化身份标识符</p>
               </div>
-              
-              <!-- ECDSA密钥信息 -->
-              <div class="key-section">
-                <h4>🔐 ECDSA密钥 (身份验证)</h4>
-                <div class="result-item">
-                  <label>ECDSA公钥:</label>
-                  <div class="result-value">
-                    <code>{{ registerResult.ecdsaKeyPair.publicKey }}</code>
-                    <button @click="copyToClipboard(registerResult.ecdsaKeyPair.publicKey)" class="copy-btn">📋</button>
-                  </div>
-                </div>
-                <div class="result-item">
-                  <label>ECDSA私钥 (请妥善保管):</label>
-                  <div class="result-value">
-                    <code class="private-key">{{ showECDSAPrivateKey ? registerResult.ecdsaKeyPair.privateKey : '••••••••••••••••••••••••••••••••' }}</code>
-                    <button @click="toggleECDSAPrivateKey" class="toggle-btn">{{ showECDSAPrivateKey ? '👁️' : '👁️‍🗨️' }}</button>
-                    <button @click="copyToClipboard(registerResult.ecdsaKeyPair.privateKey)" class="copy-btn">📋</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 格加密密钥信息 -->
-              <div class="key-section">
-                <h4>🛡️ Kyber768密钥 (通信加密)</h4>
-                <div class="result-item">
-                  <label>Kyber768公钥:</label>
-                  <div class="result-value">
-                    <code>{{ registerResult.kyberKeyPair.publicKey.substring(0, 64) }}...</code>
-                    <button @click="copyToClipboard(registerResult.kyberKeyPair.publicKey)" class="copy-btn">📋</button>
-                  </div>
-                </div>
-                <div class="result-item">
-                  <label>Kyber768私钥 (请妥善保管):</label>
-                  <div class="result-value">
-                    <code class="private-key">{{ showKyberPrivateKey ? registerResult.kyberKeyPair.privateKey.substring(0, 64) + '...' : '••••••••••••••••••••••••••••••••' }}</code>
-                    <button @click="toggleKyberPrivateKey" class="toggle-btn">{{ showKyberPrivateKey ? '👁️' : '👁️‍🗨️' }}</button>
-                    <button @click="copyToClipboard(registerResult.kyberKeyPair.privateKey)" class="copy-btn">📋</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 兼容性显示 (保留原有字段) -->
-              <div class="key-section legacy-section">
-                <h4>📋 兼容性信息</h4>
-                <div class="result-item">
-                  <label>主公钥 (ECDSA):</label>
-                  <div class="result-value">
-                    <code>{{ registerResult.publicKey }}</code>
-                    <button @click="copyToClipboard(registerResult.publicKey)" class="copy-btn">📋</button>
-                  </div>
-                </div>
-                <div class="result-item">
-                  <label>主私钥 (ECDSA):</label>
-                  <div class="result-value">
-                    <code class="private-key">{{ showPrivateKey ? registerResult.privateKey : '••••••••••••••••••••••••••••••••' }}</code>
-                    <button @click="togglePrivateKey" class="toggle-btn">{{ showPrivateKey ? '👁️' : '👁️‍🗨️' }}</button>
-                    <button @click="copyToClipboard(registerResult.privateKey)" class="copy-btn">📋</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="warning">
-                ⚠️ 请务必安全保存您的所有私钥，丢失后无法恢复！<br>
-                💡 ECDSA私钥用于身份验证，Kyber768私钥用于通信加密
-              </div>
-              <button class="btn btn-success" @click="goToLogin">
-                前往登录 →
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- DID登录 -->
-        <div v-if="activeTab === 'login'" class="tab-content">
-          <div class="section-header">
-            <h2>🔐 DID身份登录</h2>
-            <p>使用您的DID进行安全身份验证</p>
-          </div>
-          
-          <div class="login-form">
-            <div class="form-group">
-              <label>DID标识符</label>
-              <input 
-                v-model="loginForm.did" 
-                type="text" 
-                class="form-input"
-                placeholder="输入您的DID，如: did:qlink:123456"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>私钥</label>
-              <input 
-                v-model="loginForm.privateKey" 
-                type="password" 
-                class="form-input"
-                placeholder="输入您的私钥进行身份验证"
-              />
-            </div>
-
-            <div class="form-actions">
-              <button 
-                class="btn btn-primary" 
-                @click="loginWithDID"
-                :disabled="loggingIn"
-              >
-                <span v-if="loggingIn">⏳</span>
-                <span v-else>🔐</span>
-                {{ loggingIn ? '验证中...' : '开始登录' }}
-              </button>
-            </div>
-
-            <!-- 质询-响应流程 -->
-            <div v-if="challengeData" class="challenge-section">
-              <h3>🎯 身份质询</h3>
-              <div class="challenge-info">
-                <p>系统已生成质询信息，请确认以下信息并完成签名验证：</p>
-                <div class="challenge-details">
-                  <div class="detail-item">
-                    <label>质询ID:</label>
-                    <code>{{ challengeData.id }}</code>
-                  </div>
-                  <div class="detail-item">
-                    <label>质询内容:</label>
-                    <code>{{ challengeData.content }}</code>
-                  </div>
-                  <div class="detail-item">
-                    <label>时间戳:</label>
-                    <span>{{ formatDate(challengeData.timestamp) }}</span>
-                  </div>
-                </div>
-                
-                <div class="form-actions">
-                  <button 
-                    class="btn btn-secondary" 
-                    @click="cancelChallenge"
-                  >
-                    取消
-                  </button>
-                  <button 
-                    class="btn btn-primary" 
-                    @click="signChallenge"
-                    :disabled="responding"
-                  >
-                    <span v-if="responding">⏳</span>
-                    <span v-else>✍️</span>
-                    {{ responding ? '签名中...' : '签名确认' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 登录结果 -->
-            <div v-if="loginResult" class="login-result">
-              <h3>✅ 登录成功！</h3>
-              <div class="result-card">
-                <div class="result-item">
-                  <label>用户DID:</label>
-                  <span>{{ loginResult.did }}</span>
-                </div>
-                <div class="result-item">
-                  <label>会话令牌:</label>
-                  <code>{{ loginResult.token }}</code>
-                </div>
-                <div class="result-item">
-                  <label>登录时间:</label>
-                  <span>{{ loginResult.loginTime }}</span>
-                </div>
-                <div class="result-item">
-                  <label>有效期至:</label>
-                  <span>{{ loginResult.expiresAt }}</span>
-                </div>
-              </div>
-              <div class="form-actions">
-                <button class="btn btn-success" @click="goToChat">
-                  进入聊天室 →
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- DID查询 -->
-        <div v-if="activeTab === 'query'" class="tab-content">
-          <div class="section-header">
-            <h2>🔍 DID身份查询</h2>
-            <p>查询已注册的DID身份信息</p>
-          </div>
-
-          <div class="query-form">
-            <div class="form-group">
-              <label>DID标识符</label>
-              <input 
-                v-model="queryForm.did" 
-                type="text" 
-                class="form-input"
-                placeholder="输入要查询的DID，如: did:qlink:123456"
-              />
-            </div>
-            <div class="form-actions">
-              <button 
-                class="btn btn-primary" 
-                @click="queryDID"
-                :disabled="querying"
-              >
-                <span v-if="querying">⏳</span>
-                <span v-else>🔍</span>
-                {{ querying ? '查询中...' : '查询DID' }}
-              </button>
-            </div>
-
-            <!-- 查询结果 -->
-            <div v-if="queryResult" class="query-result">
-              <h3>📋 DID信息</h3>
-              <div class="result-card">
-                <div class="result-item">
-                  <label>DID:</label>
-                  <span>{{ queryResult.did }}</span>
-                </div>
-                <div class="result-item">
-                  <label>状态:</label>
-                  <span :class="['status', queryResult.status]">{{ queryResult.status === 'active' ? '✅ 活跃' : '❌ 已停用' }}</span>
-                </div>
-                <div class="result-item">
-                  <label>创建时间:</label>
-                  <span>{{ formatDate(queryResult.created) }}</span>
-                </div>
-                <div class="result-item">
-                  <label>公钥:</label>
-                  <code>{{ queryResult.publicKey }}</code>
-                </div>
-                <div v-if="queryResult.description" class="result-item">
-                  <label>描述:</label>
-                  <span>{{ queryResult.description }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- DID管理 -->
-        <div v-if="activeTab === 'manage'" class="tab-content">
-          <div class="section-header">
-            <h2>⚙️ DID身份管理</h2>
-            <p>管理您的DID身份信息</p>
-          </div>
-
-          <div class="manage-form">
-            <div class="form-group">
-              <label>您的DID标识符</label>
-              <input 
-                v-model="manageForm.did" 
-                type="text" 
-                class="form-input"
-                placeholder="输入您的DID"
-              />
-            </div>
-            <div class="form-group">
-              <label>私钥验证</label>
-              <input 
-                v-model="manageForm.privateKey" 
-                type="password" 
-                class="form-input"
-                placeholder="输入私钥以验证身份"
-              />
-            </div>
-            <div class="form-actions">
-              <button 
-                class="btn btn-primary" 
-                @click="verifyOwnership"
-                :disabled="verifying"
-              >
-                <span v-if="verifying">⏳</span>
-                <span v-else">🔐</span>
-                {{ verifying ? '验证中...' : '验证身份' }}
-              </button>
-            </div>
-
-            <!-- 管理操作 -->
-            <div v-if="ownershipVerified" class="management-actions">
-              <h3>🛠️ 可用操作</h3>
-              <div class="action-grid">
-                <button class="action-btn update" @click="showUpdateForm = true">
-                  <span>📝</span>
-                  <div>
-                    <strong>更新信息</strong>
-                    <small>修改DID描述信息</small>
-                  </div>
-                </button>
-                <button class="action-btn rotate" @click="rotateKeys">
-                  <span>🔄</span>
-                  <div>
-                    <strong>轮换密钥</strong>
-                    <small>生成新的密钥对</small>
-                  </div>
-                </button>
-                <button class="action-btn deactivate" @click="deactivateDID">
-                  <span>🚫</span>
-                  <div>
-                    <strong>停用DID</strong>
-                    <small>暂时停用此身份</small>
-                  </div>
-                </button>
-                <button class="action-btn delete" @click="deleteDID">
-                  <span>🗑️</span>
-                  <div>
-                    <strong>删除DID</strong>
-                    <small>永久删除此身份</small>
-                  </div>
-                </button>
-              </div>
-
-              <!-- 更新表单 -->
-              <div v-if="showUpdateForm" class="update-form">
-                <h4>📝 更新DID信息</h4>
+              <div class="register-form">
                 <div class="form-group">
-                  <label>新的描述信息</label>
+                  <label>类型</label>
+                  <select v-model="registerForm.didType" class="form-select">
+                    <option value="did:qlink">did:qlink</option>
+                    <option value="did:ethr">did:ethr</option>
+                    <option value="did:key">did:key</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>标识</label>
+                  <input 
+                    v-model="registerForm.identifier" 
+                    type="text" 
+                    class="form-input"
+                    placeholder="留空将自动生成"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>描述</label>
                   <textarea 
-                    v-model="updateForm.description" 
+                    v-model="registerForm.description" 
                     class="form-textarea"
+                    placeholder="为您的DID添加描述信息"
                     rows="3"
                   ></textarea>
                 </div>
                 <div class="form-actions">
-                  <button class="btn btn-secondary" @click="showUpdateForm = false">取消</button>
-                  <button class="btn btn-primary" @click="updateDID">更新</button>
+                  <button 
+                    class="btn btn-primary" 
+                    @click="registerDID"
+                    :disabled="registering"
+                  >
+                    <span v-if="registering">⏳</span>
+                    {{ registering ? '注册中...' : '生成DID身份' }}
+                  </button>
                 </div>
               </div>
             </div>
+            <div class="col-right">
+              <div v-if="registerResult" class="form-card register-result">
+                <h3>✅ 注册成功！</h3>
+                <div class="result-item">
+                  <label>DID标识符:</label>
+                  <div class="result-value">
+                    <code>{{ registerResult.did }}</code>
+                    <button @click="copyToClipboard(registerResult.did)" class="copy-btn">📋</button>
+                  </div>
+                </div>
+                <div class="key-section">
+                  <h4>🔐 ECDSA密钥 (身份验证)</h4>
+                  <div class="result-item">
+                    <label>ECDSA公钥:</label>
+                    <div class="result-value">
+                      <code>{{ registerResult.ecdsaKeyPair.publicKey }}</code>
+                      <button @click="copyToClipboard(registerResult.ecdsaKeyPair.publicKey)" class="copy-btn">📋</button>
+                    </div>
+                  </div>
+                  <div class="result-item">
+                    <label>ECDSA私钥 (请妥善保管):</label>
+                    <div class="result-value">
+                      <code class="private-key">{{ showECDSAPrivateKey ? registerResult.ecdsaKeyPair.privateKey : '••••••••••••••••••••••••••••••••' }}</code>
+                      <button @click="toggleECDSAPrivateKey" class="toggle-btn">{{ showECDSAPrivateKey ? '👁️' : '👁️‍🗨️' }}</button>
+                      <button @click="copyToClipboard(registerResult.ecdsaKeyPair.privateKey)" class="copy-btn">📋</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="key-section">
+                  <h4>🛡️ Kyber768密钥 (通信加密)</h4>
+                  <div class="result-item">
+                    <label>Kyber768公钥:</label>
+                    <div class="result-value">
+                      <code>{{ registerResult.kyberKeyPair.publicKey.substring(0, 64) }}...</code>
+                      <button @click="copyToClipboard(registerResult.kyberKeyPair.publicKey)" class="copy-btn">📋</button>
+                    </div>
+                  </div>
+                  <div class="result-item">
+                    <label>Kyber768私钥 (请妥善保管):</label>
+                    <div class="result-value">
+                      <code class="private-key">{{ showKyberPrivateKey ? registerResult.kyberKeyPair.privateKey.substring(0, 64) + '...' : '••••••••••••••••••••••••••••••••' }}</code>
+                      <button @click="toggleKyberPrivateKey" class="toggle-btn">{{ showKyberPrivateKey ? '👁️' : '👁️‍🗨️' }}</button>
+                      <button @click="copyToClipboard(registerResult.kyberKeyPair.privateKey)" class="copy-btn">📋</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="key-section legacy-section">
+                  <h4>📋 兼容性信息</h4>
+                  <div class="result-item">
+                    <label>主公钥 (ECDSA):</label>
+                    <div class="result-value">
+                      <code>{{ registerResult.publicKey }}</code>
+                      <button @click="copyToClipboard(registerResult.publicKey)" class="copy-btn">📋</button>
+                    </div>
+                  </div>
+                  <div class="result-item">
+                    <label>主私钥 (ECDSA):</label>
+                    <div class="result-value">
+                      <code class="private-key">{{ showPrivateKey ? registerResult.privateKey : '••••••••••••••••••••••••••••••••' }}</code>
+                      <button @click="togglePrivateKey" class="toggle-btn">{{ showPrivateKey ? '👁️' : '👁️‍🗨️' }}</button>
+                      <button @click="copyToClipboard(registerResult.privateKey)" class="copy-btn">📋</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="warning">
+                  ⚠️ 请务必安全保存您的所有私钥，丢失后无法恢复！<br>
+                  💡 ECDSA私钥用于身份验证，Kyber768私钥用于通信加密
+                </div>
+              </div>
+              <div v-else class="result-placeholder"></div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <!-- 帮助文档 -->
-        <div v-if="activeTab === 'help'" class="tab-content">
-          <div class="section-header">
-            <h2>📚 帮助文档</h2>
-            <p>了解DID身份系统的使用方法</p>
+        
+
+        <!-- DID查询 -->
+        <section id="query" class="tab-content full-screen">
+          <div class="two-col">
+            <div class="col-left form-card">
+              <div class="section-header">
+                <h2>DID身份查询</h2>
+                <p>查询已注册的DID身份信息</p>
+              </div>
+              <div class="query-form">
+                <div class="form-group">
+                  <label>DID标识符</label>
+                  <input 
+                    v-model="queryForm.did" 
+                    type="text" 
+                    class="form-input"
+                    placeholder="输入要查询的DID"
+                    @keydown.enter="queryDID"
+                  />
+                </div>
+                <div class="form-actions">
+                  <button 
+                    class="btn btn-primary" 
+                    @click="queryDID"
+                    :disabled="querying"
+                  >
+                    {{ querying ? '查询中...' : '查询' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="col-right">
+              <div v-if="queryResult" class="form-card query-result">
+                <h3>📋 DID信息</h3>
+                <div class="result-card">
+                  <div class="result-item">
+                    <label>DID:</label>
+                    <span>{{ queryResult.did }}</span>
+                  </div>
+                  <div class="result-item">
+                    <label>状态:</label>
+                    <span :class="['status', queryResult.status]">{{ queryResult.status === 'active' ? '✅ 活跃' : '❌ 已停用' }}</span>
+                  </div>
+                  <div class="result-item">
+                    <label>创建时间:</label>
+                    <span>{{ formatDate(queryResult.created) }}</span>
+                  </div>
+                  <div class="result-item">
+                    <label>公钥:</label>
+                    <code>{{ queryResult.publicKey }}</code>
+                  </div>
+                  <div v-if="queryResult.description" class="result-item">
+                    <label>描述:</label>
+                    <span>{{ queryResult.description }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="result-placeholder"></div>
+            </div>
           </div>
+        </section>
 
-          <div class="help-content">
-            <div class="help-section">
-              <h3>🤔 什么是DID？</h3>
-              <p>DID（Decentralized Identifier，去中心化标识符）是一种新型的身份标识符，它允许用户完全控制自己的数字身份，无需依赖中心化的身份提供商。</p>
+        <!-- DID管理 -->
+        <section id="manage" class="tab-content full-screen">
+          <div class="two-col">
+            <div class="col-left form-card">
+              <div class="section-header">
+                <h2>DID身份管理</h2>
+                <p>管理您的DID身份信息</p>
+              </div>
+              <div class="manage-form">
+                <div class="form-group">
+                  <label>您的DID标识符</label>
+                  <input 
+                    v-model="manageForm.did" 
+                    type="text" 
+                    class="form-input"
+                    placeholder="输入您的DID"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>私钥验证</label>
+                  <input 
+                    v-model="manageForm.privateKey" 
+                    type="password" 
+                    class="form-input"
+                    placeholder="输入私钥以验证身份"
+                  />
+                </div>
+                <div class="form-actions">
+                  <button 
+                    class="btn btn-primary" 
+                    @click="verifyOwnership"
+                    :disabled="verifying"
+                  >
+                    {{ verifying ? '验证中...' : '验证' }}
+                  </button>
+                </div>
+              </div>
             </div>
-
-            <div class="help-section">
-              <h3>🔐 密钥管理</h3>
-              <ul>
-                <li><strong>私钥</strong>：用于签名和证明身份所有权，请务必安全保管</li>
-                <li><strong>公钥</strong>：用于验证签名，可以公开分享</li>
-                <li><strong>密钥轮换</strong>：定期更换密钥以提高安全性</li>
-              </ul>
-            </div>
-
-            <div class="help-section">
-              <h3>🛡️ 安全建议</h3>
-              <ul>
-                <li>将私钥保存在安全的地方，建议使用硬件钱包</li>
-                <li>不要在不安全的网络环境中输入私钥</li>
-                <li>定期备份您的密钥信息</li>
-                <li>如果怀疑私钥泄露，立即进行密钥轮换</li>
-              </ul>
-            </div>
-
-            <div class="help-section">
-              <h3>🔄 操作流程</h3>
-              <ol>
-                <li><strong>注册</strong>：创建新的DID身份</li>
-                <li><strong>查询</strong>：验证DID的有效性和状态</li>
-                <li><strong>管理</strong>：更新、轮换或删除DID</li>
-                <li><strong>登录</strong>：使用DID进行身份验证</li>
-              </ol>
+            <div class="col-right">
+              <div v-if="ownershipVerified" class="form-card management-actions">
+                <h3>🛠️ 可用操作</h3>
+                <div class="action-grid">
+                  <button class="action-btn update" @click="showUpdateForm = true">
+                    <span>📝</span>
+                    <div>
+                      <strong>更新信息</strong>
+                      <small>修改DID描述信息</small>
+                    </div>
+                  </button>
+                  <button class="action-btn rotate" @click="rotateKeys">
+                    <span>🔄</span>
+                    <div>
+                      <strong>轮换密钥</strong>
+                      <small>生成新的密钥对</small>
+                    </div>
+                  </button>
+                  <button class="action-btn deactivate" @click="deactivateDID">
+                    <span>🚫</span>
+                    <div>
+                      <strong>停用DID</strong>
+                      <small>暂时停用此身份</small>
+                    </div>
+                  </button>
+                  <button class="action-btn delete" @click="deleteDID">
+                    <span>🗑️</span>
+                    <div>
+                      <strong>删除DID</strong>
+                      <small>永久删除此身份</small>
+                    </div>
+                  </button>
+                </div>
+                <div v-if="showUpdateForm" class="update-form">
+                  <h4>📝 更新DID信息</h4>
+                  <div class="form-group">
+                    <label>新的描述信息</label>
+                    <textarea 
+                      v-model="updateForm.description" 
+                      class="form-textarea"
+                      rows="3"
+                    ></textarea>
+                  </div>
+                  <div class="form-actions">
+                    <button class="btn btn-secondary" @click="showUpdateForm = false">取消</button>
+                    <button class="btn btn-primary" @click="updateDID">更新</button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="result-placeholder"></div>
             </div>
           </div>
-        </div>
+        </section>
+
+        
       </div>
     </main>
 
     <!-- 错误提示 -->
     <div v-if="error" class="error-toast" @click="error = ''">
-      <span>❌</span>
       {{ error }}
     </div>
 
     <!-- 成功提示 -->
     <div v-if="success" class="success-toast" @click="success = ''">
-      <span>✅</span>
       {{ success }}
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { generateDualKeyPair, generateDID, generateECDSASignature, signData } from '../utils/crypto.js'
+import { generateDualKeyPair, generateDID, signData } from '../utils/crypto.js'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 // 响应式数据
-const activeTab = ref('register')
 const error = ref('')
 const success = ref('')
 
-// 标签页配置
-const tabs = [
-  { id: 'register', name: '注册DID', icon: '🆔' },
-  { id: 'login', name: 'DID登录', icon: '🔐' },
-  { id: 'query', name: '查询DID', icon: '🔍' },
-  { id: 'manage', name: '管理DID', icon: '⚙️' },
-  { id: 'help', name: '帮助', icon: '📚' }
-]
+// 首页英雄区滚动特效
+const heroOpacity = ref(1)
+const heroTranslateY = ref(0)
+let heroScrollHandler = null
+
+// 分屏滚动与顶部按钮状态
+const sections = ['home', 'register', 'query', 'manage']
+const activeSection = ref('home')
+let wheelLock = false
+let sectionObserver = null
+
+const wheelHandler = (e) => {
+  // 更平滑的分屏滚动：仅在切换分屏时阻止默认滚动
+  if (wheelLock) return
+  const idx = sections.indexOf(activeSection.value)
+  let target = null
+  const threshold = 25
+  if (e.deltaY > threshold) {
+    // 下滚：切换到下一屏
+    if (idx < sections.length - 1) target = sections[idx + 1]
+  } else if (e.deltaY < -threshold) {
+    // 上滚：首页允许默认滚动以查看标题，其余切换上一屏
+    if (idx > 0) target = sections[idx - 1]
+    else return
+  }
+
+  if (target) {
+    e.preventDefault()
+    wheelLock = true
+    goSection(target)
+    setTimeout(() => { wheelLock = false }, 500)
+  }
+}
+
+const goSection = (id) => {
+  activeSection.value = id
+  const el = document.getElementById(id)
+  if (!el) return
+  // 使用平滑滚动，提升体验
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// 联系我们：打开默认邮件客户端，且提供复制邮箱的兜底
+const contactUs = async () => {
+  const email = 'contact@qlink.local'
+  const subject = encodeURIComponent('QLink咨询')
+  const body = encodeURIComponent('请简要描述您的需求或问题')
+  const mailto = `mailto:${email}?subject=${subject}&body=${body}`
+  try {
+    window.location.href = mailto
+    success.value = '已尝试打开邮件客户端'
+  } catch (err) {
+    // 兜底：复制邮箱地址
+    try {
+      await navigator.clipboard.writeText(email)
+      success.value = '已复制邮箱地址：' + email
+    } catch (copyErr) {
+      error.value = '请手动联系邮箱：' + email
+    }
+  }
+}
+
+// 采用单页滚动分区，不再使用选项卡
 
 // 注册相关
 const registering = ref(false)
@@ -513,15 +429,7 @@ const showPrivateKey = ref(false)
 const showECDSAPrivateKey = ref(false)
 const showKyberPrivateKey = ref(false)
 
-// 登录相关
-const loggingIn = ref(false)
-const loginForm = ref({
-  did: '',
-  privateKey: ''
-})
-const challengeData = ref(null)
-const responding = ref(false)
-const loginResult = ref(null)
+// 登录相关（已移除）
 
 // 查询相关
 const querying = ref(false)
@@ -543,9 +451,6 @@ const updateForm = ref({
 })
 
 // 方法
-const goBack = () => {
-  router.push('/login')
-}
 
 const registerDID = async () => {
   registering.value = true
@@ -562,19 +467,24 @@ const registerDID = async () => {
       latticePrivateKeyLength: dualKeyPair.latticeKeyPair.privateKey.length
     })
     
-    // 使用ECDSA公钥生成DID
-    const generatedDID = generateDID(dualKeyPair.ecdsaKeyPair.publicKey)
-    console.log('生成的DID:', generatedDID)
+    // 构造最终DID：优先使用用户输入的标识符
+    const didType = (registerForm.value.didType || 'did:qlink').trim()
+    const identifier = (registerForm.value.identifier || '').trim()
+    if (identifier && identifier.length <= 8) {
+      throw new Error('标识需大于8个字符')
+    }
+    const finalDID = identifier ? `${didType}:${identifier}` : generateDID(dualKeyPair.ecdsaKeyPair.publicKey)
+    console.log('最终DID:', finalDID)
 
     // 构造DID文档（包含双公钥，ECDSA采用JsonWebKey2020/P-256）
     const didDocument = {
       '@context': 'https://www.w3.org/ns/did/v1',
-      id: generatedDID,
+      id: finalDID,
       verificationMethod: [
         {
-          id: `${generatedDID}#ecdsa-key-1`,
+          id: `${finalDID}#ecdsa-key-1`,
           type: 'JsonWebKey2020',
-          controller: generatedDID,
+          controller: finalDID,
           publicKeyJwk: {
             kty: dualKeyPair.ecdsaKeyPair.jwk.kty,
             crv: dualKeyPair.ecdsaKeyPair.jwk.crv,
@@ -583,19 +493,19 @@ const registerDID = async () => {
           }
         },
         {
-          id: `${generatedDID}#lattice-key-1`,
+          id: `${finalDID}#lattice-key-1`,
           type: 'Kyber768VerificationKey2023',
-          controller: generatedDID,
+          controller: finalDID,
           publicKeyLattice: {
             algorithm: 'Kyber768',
             publicKey: dualKeyPair.latticeKeyPair.publicKey
           }
         }
       ],
-      authentication: [`${generatedDID}#ecdsa-key-1`],
-      keyAgreement: [`${generatedDID}#lattice-key-1`],
+      authentication: [`${finalDID}#ecdsa-key-1`],
+      keyAgreement: [`${finalDID}#lattice-key-1`],
       service: [{
-        id: `${generatedDID}#service-1`,
+        id: `${finalDID}#service-1`,
         type: 'DIDCommMessaging',
         serviceEndpoint: 'https://example.com/messaging'
       }]
@@ -615,7 +525,7 @@ const registerDID = async () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          did: generatedDID,
+          did: finalDID,
           document: didDocument,
           signature: signature
         })
@@ -633,7 +543,7 @@ const registerDID = async () => {
     
     // 无论后端是否成功，都显示生成的双密钥
     registerResult.value = {
-      did: generatedDID,
+      did: finalDID,
       ecdsaKeyPair: {
         publicKey: dualKeyPair.ecdsaKeyPair.publicKey,
         privateKey: dualKeyPair.ecdsaKeyPair.privateKey
@@ -776,83 +686,7 @@ const deleteDID = async () => {
   }
 }
 
-// DID登录相关方法
-const loginWithDID = async () => {
-  if (!loginForm.value.did || !loginForm.value.privateKey) {
-    error.value = '请填写DID标识符和私钥'
-    return
-  }
-
-  loggingIn.value = true
-  error.value = ''
-  
-  try {
-    // 第一步：创建质询（改用 auth store）
-    const resp = await authStore.createChallenge(loginForm.value.did)
-    if (!resp.success) {
-      throw new Error(resp.error || '创建质询失败')
-    }
-    // 显示质询信息
-    challengeData.value = {
-      id: resp.challenge_id,
-      content: resp.challenge,
-      timestamp: new Date().toLocaleString(),
-      expiresAt: undefined
-    }
-
-  } catch (err) {
-    console.error('登录失败:', err)
-    error.value = '登录失败: ' + err.message
-  } finally {
-    loggingIn.value = false
-  }
-}
-
-const signChallenge = async () => {
-  responding.value = true
-  error.value = ''
-  
-  try {
-    // 使用ECDSA私钥对质询进行签名
-    const signature = await generateECDSASignature(challengeData.value.content, loginForm.value.privateKey)
-
-    // 第二步：使用签名验证登录（改用 auth store）
-    const result = await authStore.verifyChallenge(signature, loginForm.value.did)
-    if (!result.success) {
-      throw new Error(result.error || '登录验证失败')
-    }
-
-    // 显示登录成功结果（从 store 读取）
-    loginResult.value = {
-      did: authStore.user?.did || loginForm.value.did,
-      token: authStore.token,
-      loginTime: new Date().toLocaleString(),
-      expiresAt: '24小时后'
-    }
-
-    // 跳转到聊天
-    router.push('/chat')
-
-    // 清除质询数据
-    challengeData.value = null
-    success.value = '登录成功！'
-
-  } catch (err) {
-    console.error('签名验证失败:', err)
-    error.value = '签名验证失败: ' + err.message
-  } finally {
-    responding.value = false
-  }
-}
-
-const cancelChallenge = () => {
-  challengeData.value = null
-}
-
-const enterChatRoom = () => {
-  // 这里可以跳转到聊天室或其他页面
-  alert('即将进入聊天室...')
-}
+// 登录相关方法已删除
 
 // 跳转到聊天页面（修复模板中的 goToChat 按钮）
 const goToChat = () => {
@@ -878,6 +712,13 @@ const copyToClipboard = async (text) => {
   } catch (err) {
     error.value = '复制失败'
   }
+}
+
+// 滚动到指定分区
+const scrollTo = (id) => {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // 生成混合签名
@@ -929,14 +770,7 @@ const arrayBufferToBase64 = (buffer) => {
   return btoa(binary)
 }
 
-const goToLogin = () => {
-  activeTab.value = 'login'
-  // 如果有注册结果，自动填充DID和私钥
-  if (registerResult.value) {
-    loginForm.value.did = registerResult.value.did
-    loginForm.value.privateKey = registerResult.value.privateKey
-  }
-}
+// 已去除返回登录入口
 
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleString('zh-CN')
@@ -958,24 +792,65 @@ const watchToasts = () => {
 
 onMounted(() => {
   // 页面加载完成
+  heroScrollHandler = () => {
+    const y = window.scrollY || 0
+    const max = 300
+    const ratio = Math.min(y / max, 1)
+    heroOpacity.value = 1 - ratio * 0.6
+    heroTranslateY.value = ratio * 40
+  }
+  window.addEventListener('scroll', heroScrollHandler, { passive: true })
+  heroScrollHandler()
+
+  // 观察分屏分区，动态同步头部按钮状态
+  sectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+        activeSection.value = entry.target.id
+      }
+    })
+  }, { threshold: [0.6] })
+
+  sections.forEach(id => {
+    const el = document.getElementById(id)
+    if (el) sectionObserver.observe(el)
+  })
+
+  // 分屏滚轮
+  window.addEventListener('wheel', wheelHandler, { passive: false })
+})
+
+onUnmounted(() => {
+  if (heroScrollHandler) {
+    window.removeEventListener('scroll', heroScrollHandler)
+    heroScrollHandler = null
+  }
+  window.removeEventListener('wheel', wheelHandler)
+  if (sectionObserver) {
+    sectionObserver.disconnect()
+    sectionObserver = null
+  }
 })
 </script>
 
 <style scoped>
 .blockchain-portal {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f6f7fb;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* 头部导航 */
 .portal-header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  position: sticky;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   z-index: 100;
+  --header-h: 80px;
 }
 
 .header-content {
@@ -1002,10 +877,7 @@ onMounted(() => {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #111827;
 }
 
 .nav-menu {
@@ -1029,13 +901,13 @@ onMounted(() => {
 }
 
 .nav-tab.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #e5e7eb;
+  color: #111827;
 }
 
 .nav-tab:hover:not(.active) {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  background: #f3f4f6;
+  color: #111827;
 }
 
 .tab-icon {
@@ -1064,24 +936,146 @@ onMounted(() => {
 
 /* 主要内容 */
 .portal-main {
-  padding: 40px 20px;
+  padding: calc(var(--header-h, 80px) + 40px) 20px 40px 20px;
 }
 
 .container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
+.page-lead {
+  width: 100%;
+  margin: 0 0 16px 0;
+  padding: 10px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* 让首页分区支持全幅显示（不受.container限制） */
+.full-bleed {
+  margin-left: calc((100vw - 1200px) / -2);
+  margin-right: calc((100vw - 1200px) / -2);
+}
+
+.full-bleed .hero-banner {
+  width: 100vw;
+  border-radius: 0;
+}
+
+/* 顶部按钮组与标题同排 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-tab.active {
+  background: #e5e7eb;
+  color: #111827;
+  font-weight: 600;
+}
+
+/* 全屏分区样式 */
+.full-screen {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+}
+
+.full-screen.tab-content {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* 紫色渐变英雄横幅 */
+.hero-banner {
+  width: 100%;
+  height: calc(100vh - var(--header-h, 80px));
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  /* 与页面容器左缘对齐，使文案更靠左 */
+  padding-left: calc((100vw - 1200px) / 2 + 20px);
+  color: #fff;
+}
+
+.hero-overlay {
+  max-width: 1080px;
+  padding: 32px;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  align-items: center;
+  gap: 24px;
+}
+
+.hero-copy {
+  text-align: left;
+}
+
+.hero-title {
+  margin: 0 0 12px 0;
+  font-size: 40px;
+  font-weight: 800;
+}
+
+.hero-subtitle {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  opacity: 0.92;
+}
+
+.hero-description p {
+  margin: 0 0 8px 0;
+  opacity: 0.92;
+}
+
+.hero-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  grid-auto-rows: 48px;
+  gap: 12px;
+}
+
+.hero-actions-grid .btn {
+  justify-content: center;
+}
+
 .tab-content {
-  background: white;
-  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   padding: 40px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+
+/* 注册分区渐变背景 */
+.gradient-section {
+  background: linear-gradient(135deg, rgba(106,17,203,0.12) 0%, rgba(37,117,252,0.12) 100%);
+  border: none;
+  box-shadow: none;
+}
+
+.gradient-section .section-header h2,
+.gradient-section .section-header p {
+  color: #0b0d0e;
 }
 
 .section-header {
-  text-align: center;
-  margin-bottom: 40px;
+  text-align: left;
+  margin-bottom: 24px;
 }
 
 .section-header h2 {
@@ -1113,17 +1107,20 @@ onMounted(() => {
 .form-input, .form-select, .form-textarea {
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e0e0e0;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  transition: border-color 0.3s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   box-sizing: border-box;
   font-family: inherit;
+  background: #ffffff;
+  color: #111827;
 }
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
 }
 
 .form-textarea {
@@ -1135,6 +1132,12 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   justify-content: center;
+}
+
+/* 查询与管理页的动作按钮左对齐，更贴近表单语义 */
+.query-form .form-actions,
+.manage-form .form-actions {
+  justify-content: flex-start;
 }
 
 /* 按钮样式 */
@@ -1153,33 +1156,33 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #3b82f6;
+  color: #ffffff;
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  background: #2563eb;
 }
 
 .btn-secondary {
-  background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
+  background: #f9fafb;
+  color: #111827;
+  border: 1px solid #e5e7eb;
 }
 
 .btn-secondary:hover {
-  background: #667eea;
-  color: white;
+  background: #f3f4f6;
+  color: #111827;
 }
 
 .btn-success {
-  background: #4caf50;
-  color: white;
+  background: #10b981;
+  color: #ffffff;
 }
 
 .btn-success:hover {
-  background: #45a049;
+  background: #0ea76a;
 }
 
 .btn:disabled {
@@ -1192,14 +1195,14 @@ onMounted(() => {
 .register-result {
   margin-top: 32px;
   padding: 24px;
-  background: #f8f9ff;
+  background: #ffffff;
   border-radius: 12px;
-  border: 1px solid #e8eaff;
+  border: 1px solid #e5e7eb;
 }
 
 .register-result h3 {
   margin: 0 0 20px 0;
-  color: #4caf50;
+  color: #e5e7eb;
   font-size: 20px;
 }
 
@@ -1224,23 +1227,25 @@ onMounted(() => {
 .result-value code {
   flex: 1;
   padding: 8px 12px;
-  background: #f5f5f5;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 12px;
   word-break: break-all;
+  color: #111827;
 }
 
 .private-key {
-  background: #fff3cd !important;
-  border: 1px solid #ffeaa7;
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb;
 }
 
 .copy-btn, .toggle-btn {
   padding: 6px 8px;
-  border: none;
-  background: #667eea;
-  color: white;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #111827;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -1248,16 +1253,16 @@ onMounted(() => {
 }
 
 .copy-btn:hover, .toggle-btn:hover {
-  background: #5a6fd8;
+  background: #f3f4f6;
 }
 
 .warning {
   margin: 20px 0;
   padding: 12px 16px;
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  color: #856404;
+  color: #4b5563;
   font-size: 14px;
   font-weight: 500;
 }
@@ -1269,15 +1274,15 @@ onMounted(() => {
 
 .query-result h3 {
   margin: 0 0 16px 0;
-  color: #333;
+  color: #e5e7eb;
   font-size: 20px;
 }
 
 .result-card {
-  background: #f8f9ff;
+  background: #ffffff;
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid #e8eaff;
+  border: 1px solid #e5e7eb;
 }
 
 .result-card .result-item {
@@ -1294,7 +1299,7 @@ onMounted(() => {
 
 .result-card .result-item label {
   font-weight: 600;
-  color: #666;
+  color: #9ca3af;
   margin: 0;
 }
 
@@ -1306,14 +1311,14 @@ onMounted(() => {
 .management-actions {
   margin-top: 32px;
   padding: 24px;
-  background: #f8f9ff;
+  background: #ffffff;
   border-radius: 12px;
-  border: 1px solid #e8eaff;
+  border: 1px solid #e5e7eb;
 }
 
 .management-actions h3 {
   margin: 0 0 20px 0;
-  color: #333;
+  color: #e5e7eb;
   font-size: 20px;
 }
 
@@ -1326,8 +1331,8 @@ onMounted(() => {
 
 .action-btn {
   padding: 16px;
-  border: 2px solid #e0e0e0;
-  background: white;
+  border: 1px solid #1f2937;
+  background: #0b0d0e;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -1338,9 +1343,8 @@ onMounted(() => {
 }
 
 .action-btn:hover {
-  border-color: #667eea;
+  border-color: #374151;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .action-btn span {
@@ -1418,8 +1422,12 @@ onMounted(() => {
 /* 提示框 */
 .error-toast, .success-toast {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: calc(var(--header-h, 80px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  right: auto;
+  width: calc(100% - 40px);
+  max-width: 1200px;
   padding: 12px 20px;
   border-radius: 8px;
   color: white;
@@ -1475,6 +1483,42 @@ onMounted(() => {
 
   .form-actions {
     flex-direction: column;
+  }
+}
+</style>
+<style scoped>
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.col-left, .col-right { width: 100%; }
+
+.form-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.result-placeholder {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 24px;
+  color: #64748b;
+}
+
+/* 顶部菜单激活态下划线强调 */
+.nav-menu .nav-tab.active {
+  border-bottom: 2px solid #667eea;
+}
+
+/* 移动端提示条适配容器宽度 */
+@media (max-width: 768px) {
+  .error-toast, .success-toast {
+    width: calc(100% - 24px);
   }
 }
 </style>

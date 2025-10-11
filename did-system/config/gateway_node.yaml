@@ -68,7 +68,7 @@ sync:
 logging:
   level: "info"
   format: "json"
-  output: "./logs/gateway.log"
+  output: "./data/gateway.log"
   max_size: 100
   max_backups: 3
   max_age: 7

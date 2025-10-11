@@ -12,6 +12,7 @@ import (
     "github.com/qujing226/QLink/pkg/config"
     "github.com/qujing226/QLink/pkg/consensus"
     "github.com/qujing226/QLink/pkg/network"
+    "github.com/qujing226/QLink/pkg/storage"
     syncpkg "github.com/qujing226/QLink/pkg/sync"
 )
 
@@ -19,7 +20,7 @@ import (
 type Application struct {
     config           *config.Config
     mu               sync.RWMutex
-    storageManager   *didblockchain.StorageManager
+    storageManager   *storage.StorageManager
     didRegistry      *did.DIDRegistry
     didResolver      *did.DIDResolver
     blockchain       didblockchain.BlockchainInterface
@@ -41,14 +42,19 @@ func NewApplication(cfg *config.Config) *Application {
 
 // Initialize 初始化应用程序
 func (app *Application) Initialize() error {
-	log.Println("开始初始化应用程序...")
+    log.Println("开始初始化应用程序...")
 
-	// 1. 初始化存储管理器
-	var err error
-	app.storageManager, err = didblockchain.NewStorageManager(app.config)
-	if err != nil {
-		return fmt.Errorf("初始化存储管理器失败: %v", err)
-	}
+    // 1. 初始化存储管理器
+    var err error
+    sf := storage.NewStorageFactory()
+    app.storageManager, err = sf.CreateDefaultStorageManager()
+    if err != nil {
+        return fmt.Errorf("初始化存储管理器失败: %v", err)
+    }
+    // 启动所有存储并加载DID文档
+    if err := app.storageManager.StartAll(context.Background()); err != nil {
+        return fmt.Errorf("启动存储失败: %v", err)
+    }
 
 	// 2. 初始化区块链接口
 	blockchainConfig := &didblockchain.BlockchainConfig{
@@ -59,9 +65,9 @@ func (app *Application) Initialize() error {
 		return fmt.Errorf("初始化区块链失败: %v", err)
 	}
 
-	// 3. 初始化DID注册表和解析器
-	app.didRegistry = did.NewDIDRegistry(app.blockchain)
-	app.didResolver = did.NewDIDResolver(app.config, app.didRegistry, app.storageManager)
+    // 3. 初始化DID注册表和解析器
+    app.didRegistry = did.NewDIDRegistry(app.blockchain, app.storageManager)
+    app.didResolver = did.NewDIDResolver(app.config, app.didRegistry, app.storageManager)
 
 	// 4. 初始化网络组件
 	if app.config.Network != nil {
@@ -184,37 +190,6 @@ func (app *Application) Stop() error {
 	return nil
 }
 
-// GetCLIClient 获取CLI客户端
-func (app *Application) GetCLIClient() *CLIClient {
-	return &CLIClient{
-		config:      app.config,
-		didRegistry: app.didRegistry,
-		didResolver: app.didResolver,
-	}
-}
-
-// GetDemo 获取演示实例
-func (app *Application) GetDemo() *Demo {
-	return &Demo{
-		config:      app.config,
-		didRegistry: app.didRegistry,
-		didResolver: app.didResolver,
-	}
-}
-
-// CLIClient CLI客户端
-type CLIClient struct {
-	config      *config.Config
-	didRegistry *did.DIDRegistry
-	didResolver *did.DIDResolver
-}
-
-// Demo 演示实例
-type Demo struct {
-	config      *config.Config
-	didRegistry *did.DIDRegistry
-	didResolver *did.DIDResolver
-}
 
 // GetNodeID 获取节点ID
 func (app *Application) GetNodeID() string {
@@ -247,57 +222,4 @@ func (app *Application) GetP2PAddress() string {
 		return fmt.Sprintf("%s:%d", app.config.Network.ListenAddress, app.config.Network.ListenPort)
 	}
 	return "unknown"
-}
-
-// GenerateDID 生成新的DID
-func (cli *CLIClient) GenerateDID() error {
-	if cli.didRegistry == nil {
-		return fmt.Errorf("DID注册表未初始化")
-	}
-
-	// 这里应该实现DID生成逻辑
-	fmt.Println("✅ DID生成功能暂未实现")
-	return nil
-}
-
-// RegisterDID 注册DID文档
-func (cli *CLIClient) RegisterDID(didDoc string) error {
-	if cli.didRegistry == nil {
-		return fmt.Errorf("DID注册表未初始化")
-	}
-
-	// 这里应该实现DID注册逻辑
-	fmt.Printf("✅ DID注册功能暂未实现，文档: %s\n", didDoc)
-	return nil
-}
-
-// ResolveDID 解析DID
-func (cli *CLIClient) ResolveDID(did string) error {
-	if cli.didResolver == nil {
-		return fmt.Errorf("DID解析器未初始化")
-	}
-
-	// 这里应该实现DID解析逻辑
-	fmt.Printf("✅ DID解析功能暂未实现，DID: %s\n", did)
-	return nil
-}
-
-// Run 运行演示程序
-func (demo *Demo) Run(ctx context.Context) error {
-	if demo.didRegistry == nil || demo.didResolver == nil {
-		return fmt.Errorf("演示组件未初始化")
-	}
-
-	fmt.Println("🚀 启动QLink演示程序...")
-	fmt.Println("📋 演示功能包括:")
-	fmt.Println("   - DID创建和注册")
-	fmt.Println("   - DID文档解析")
-	fmt.Println("   - 区块链交互")
-	fmt.Println("   - 共识算法演示")
-
-	// 这里应该实现具体的演示逻辑
-	fmt.Println("✅ 演示程序功能暂未完全实现")
-	fmt.Println("🎯 演示程序运行完成")
-
-	return nil
 }

@@ -1,18 +1,19 @@
 package consensus
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"sync"
-	"time"
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+    "github.com/qujing226/QLink/pkg/interfaces"
 )
 
 // ConsensusSwitcher 共识算法切换器
 type ConsensusSwitcher struct {
-	// 当前共识算法
-	currentConsensus ConsensusAlgorithm
-	currentType      ConsensusType
+    // 当前共识算法
+    currentConsensus interfaces.ConsensusAlgorithm
+    currentType      ConsensusType
 
 	// 可用的共识算法实例
 	raftNode *RaftNode
@@ -59,14 +60,6 @@ type SwitcherConfig struct {
 	EnableRollback   bool          `json:"enable_rollback"`
 	RollbackTimeout  time.Duration `json:"rollback_timeout"`
 	MaxRollbackDepth int           `json:"max_rollback_depth"`
-}
-
-// ConsensusAlgorithm 共识算法接口 (已弃用，使用interfaces.ConsensusAlgorithm)
-type ConsensusAlgorithm interface {
-	Start(ctx context.Context) error
-	Stop() error
-	Submit(proposal interface{}) error
-	GetStatus() map[string]interface{}
 }
 
 // ConsensusType 共识算法类型
@@ -441,7 +434,7 @@ func (cs *ConsensusSwitcher) backupCurrentState(event *SwitchEvent) error {
 }
 
 // syncDataToTarget 同步数据到目标算法
-func (cs *ConsensusSwitcher) syncDataToTarget(source, target ConsensusAlgorithm, event *SwitchEvent) error {
+func (cs *ConsensusSwitcher) syncDataToTarget(source, target interfaces.ConsensusAlgorithm, event *SwitchEvent) error {
 	log.Printf("同步数据到目标算法")
 
 	// 创建同步上下文
@@ -466,7 +459,7 @@ func (cs *ConsensusSwitcher) syncDataToTarget(source, target ConsensusAlgorithm,
 }
 
 // validateSwitch 验证切换结果
-func (cs *ConsensusSwitcher) validateSwitch(target ConsensusAlgorithm, event *SwitchEvent) error {
+func (cs *ConsensusSwitcher) validateSwitch(target interfaces.ConsensusAlgorithm, event *SwitchEvent) error {
 	log.Printf("验证切换结果")
 
 	// 检查目标算法状态
@@ -521,7 +514,7 @@ func (cs *ConsensusSwitcher) performRollback(event *SwitchEvent) error {
 }
 
 // getConsensusAlgorithm 获取共识算法实例
-func (cs *ConsensusSwitcher) getConsensusAlgorithm(consensusType ConsensusType) (ConsensusAlgorithm, error) {
+func (cs *ConsensusSwitcher) getConsensusAlgorithm(consensusType ConsensusType) (interfaces.ConsensusAlgorithm, error) {
 	switch consensusType {
 	case ConsensusTypeRaft:
 		if cs.raftNode == nil {
@@ -562,10 +555,10 @@ func (cs *ConsensusSwitcher) GetCurrentType() ConsensusType {
 }
 
 // GetCurrentConsensus 获取当前共识算法实例
-func (cs *ConsensusSwitcher) GetCurrentConsensus() ConsensusAlgorithm {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-	return cs.currentConsensus
+func (cs *ConsensusSwitcher) GetCurrentConsensus() interfaces.ConsensusAlgorithm {
+    cs.mu.RLock()
+    defer cs.mu.RUnlock()
+    return cs.currentConsensus
 }
 
 // GetSwitchState 获取切换状态

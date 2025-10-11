@@ -1,9 +1,9 @@
 启动 DID-QLink 节点...
-2025/10/06 23:32:06 检查API配置: didCfg.API=0xc0000ee3f0
-2025/10/06 23:32:06 didCfg API配置存在，Port=8080
-2025/10/06 23:32:06 准备启动API服务器...
-2025/10/06 23:32:06 API服务器创建成功: 0xc0000cea00
-2025/10/06 23:32:06 API服务器创建成功，准备启动...
+2025/10/11 15:36:18 检查API配置: didCfg.API=0xc0001587e0
+2025/10/11 15:36:18 didCfg API配置存在，Port=8080
+2025/10/11 15:36:18 准备启动API服务器...
+2025/10/11 15:36:18 API服务器创建成功: 0xc0002097c0
+2025/10/11 15:36:18 API服务器创建成功，准备启动...
 DID-QLink 节点已启动 (端口: 30300)
 API 服务地址: http://:8080
 [GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
@@ -40,6 +40,58 @@ API 服务地址: http://:8080
 [GIN-debug] GET    /api/v1/cluster/status    --> github.com/qujing226/QLink/pkg/api.(*Server).getClusterStatus-fm (6 handlers)
 [GIN-debug] POST   /api/v1/cluster/sync      --> github.com/qujing226/QLink/pkg/api.(*Server).triggerSync-fm (6 handlers)
 [GIN-debug] GET    /api/v1/cluster/consensus --> github.com/qujing226/QLink/pkg/api.(*Server).getConsensusStatus-fm (6 handlers)
-2025/10/06 23:32:06 启动API服务器，监听地址: :8080
-2025/10/06 23:32:06 API 服务启动成功
-[GIN] 2025/10/06 - 23:38:21 | 200 |     405.339µs |       127.0.0.1 | POST     "/api/v1/auth/challenge"
+2025/10/11 15:36:18 启动API服务器，监听地址: :8080
+2025/10/11 15:36:18 API 服务启动成功
+[GIN] 2025/10/11 - 15:36:20 | 200 |     428.814µs |             ::1 | POST     "/api/v1/node/peers"
+[GIN] 2025/10/11 - 15:36:20 | 200 |     119.886µs |             ::1 | POST     "/api/v1/node/peers"
+[GIN] 2025/10/11 - 15:36:20 | 200 |     176.148µs |             ::1 | POST     "/api/v1/node/peers"
+[GIN] 2025/10/11 - 15:36:20 | 200 |     219.609µs |             ::1 | GET      "/api/v1/cluster/status"
+[GIN] 2025/10/11 - 15:36:22 | 200 |      222.36µs |       127.0.0.1 | POST     "/api/v1/auth/challenge"
+2025/10/11 15:36:22 质询DID: did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg, 请求DID: did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg
+2025/10/11 15:36:22 验证DID是否存在: did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg
+2025/10/11 15:36:22 解析DID: did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg
+2025/10/11 15:36:22 DID解析成功: did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg
+2025/10/11 15:36:22 开始验证ECDSA签名: DID=did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg, 质询=Please sign this challenge to authenticate your DID: did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg at 1760168182
+2025/10/11 15:36:22 DID与JWK指纹不一致: expected=did:qlink:GETkee9hmWGqIRkF2_pekQ, got=did:qlink:3cMpRnadK0dzRmEGKMqYJyZIRyvRYjSg
+2025/10/11 15:36:22 签名验证成功
+[GIN] 2025/10/11 - 15:36:22 | 200 |     850.486µs |       127.0.0.1 | POST     "/api/v1/auth/login"
+[GIN] 2025/10/11 - 18:16:01 | 200 |   25.834046ms |       127.0.0.1 | POST     "/api/v1/auth/challenge"
+2025/10/11 18:16:01 质询DID: did:qlink:XYtWZYLl9mOwvaQuVDKne8oe5sljtmbw, 请求DID: did:qlink:XYtWZYLl9mOwvaQuVDKne8oe5sljtmbw
+2025/10/11 18:16:01 验证DID是否存在: did:qlink:XYtWZYLl9mOwvaQuVDKne8oe5sljtmbw
+2025/10/11 18:16:01 解析DID: did:qlink:XYtWZYLl9mOwvaQuVDKne8oe5sljtmbw
+2025/10/11 18:16:01 DID解析结果为空或未找到文档: did:qlink:XYtWZYLl9mOwvaQuVDKne8oe5sljtmbw
+[GIN] 2025/10/11 - 18:16:01 | 400 |     7.26823ms |       127.0.0.1 | POST     "/api/v1/auth/login"
+[GIN] 2025/10/11 - 18:40:48 | 204 |    3.759371ms |       127.0.0.1 | OPTIONS  "/api/v1/did/register"
+2025/10/11 18:40:48 区块链注册失败，但DID已在内存中注册: did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ, 错误: 区块链未连接
+[GIN] 2025/10/11 - 18:40:48 | 201 |   15.830026ms |       127.0.0.1 | POST     "/api/v1/did/register"
+[GIN] 2025/10/11 - 18:41:19 | 200 |     878.963µs |       127.0.0.1 | POST     "/api/v1/auth/challenge"
+2025/10/11 18:41:19 质询DID: did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ, 请求DID: did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ
+2025/10/11 18:41:19 验证DID是否存在: did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ
+2025/10/11 18:41:19 解析DID: did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ
+2025/10/11 18:41:19 DID解析成功: did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ
+2025/10/11 18:41:19 开始验证ECDSA签名: DID=did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ, 质询=Please sign this challenge to authenticate your DID: did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ at 1760179279
+2025/10/11 18:41:19 DID与JWK指纹不一致: expected=did:qlink:CZDpN4PW-MSca7lYAfYCkQ, got=did:qlink:XnRauC7IYzTctWDJtMU0bu8dumAsxpcQ
+2025/10/11 18:41:19 签名验证成功
+[GIN] 2025/10/11 - 18:41:19 | 200 |   12.571783ms |       127.0.0.1 | POST     "/api/v1/auth/login"
+[GIN] 2025/10/11 - 18:41:53 | 204 |      342.76µs |       127.0.0.1 | OPTIONS  "/api/v1/did/register"
+2025/10/11 18:41:53 区块链注册失败，但DID已在内存中注册: did:qlink:wda, 错误: 区块链未连接
+[GIN] 2025/10/11 - 18:41:53 | 201 |    1.850921ms |       127.0.0.1 | POST     "/api/v1/did/register"
+[GIN] 2025/10/11 - 19:42:45 | 200 |    6.300431ms |       127.0.0.1 | POST     "/api/v1/auth/challenge"
+[GIN] 2025/10/11 - 19:48:41 | 200 |     3.40318ms |       127.0.0.1 | POST     "/api/v1/auth/challenge"
+2025/10/11 19:48:41 质询DID: did:qlink:abcdefghijklmnopqrstuvwx12345678, 请求DID: did:qlink:abcdefghijklmnopqrstuvwx12345678
+2025/10/11 19:48:41 验证DID是否存在: did:qlink:abcdefghijklmnopqrstuvwx12345678
+2025/10/11 19:48:41 解析DID: did:qlink:abcdefghijklmnopqrstuvwx12345678
+2025/10/11 19:48:41 DID解析结果为空或未找到文档: did:qlink:abcdefghijklmnopqrstuvwx12345678
+[GIN] 2025/10/11 - 19:48:41 | 400 |    1.893852ms |       127.0.0.1 | POST     "/api/v1/auth/login"
+2025/10/11 20:34:29 区块链注册失败，但DID已在内存中注册: did:qlink:7pLdp8FoyxpnZYa7pdh1lr2R617VTJbQ, 错误: 区块链未连接
+[GIN] 2025/10/11 - 20:34:29 | 201 |   14.843229ms |       127.0.0.1 | POST     "/api/v1/did/register"
+[GIN] 2025/10/11 - 20:35:43 | 204 |     430.322µs |       127.0.0.1 | OPTIONS  "/api/v1/did/resolve/w"
+2025/10/11 20:35:43 解析DID: w
+[GIN] 2025/10/11 - 20:35:43 | 200 |   22.551589ms |       127.0.0.1 | GET      "/api/v1/did/resolve/w"
+[GIN] 2025/10/11 - 20:49:16 | 204 |     719.276µs |       127.0.0.1 | OPTIONS  "/api/v1/did/register"
+2025/10/11 20:49:16 区块链注册失败，但DID已在内存中注册: did:qlink:sdVixO1KvTi16ezQPfGcp98LhWnInxPQ, 错误: 区块链未连接
+[GIN] 2025/10/11 - 20:49:16 | 201 |    3.780078ms |       127.0.0.1 | POST     "/api/v1/did/register"
+2025/10/11 21:07:14 区块链注册失败，但DID已在内存中注册: did:qlink:aXB2mr4QqZIHnOmNp3T9GNGIyZv31pew, 错误: 区块链未连接
+[GIN] 2025/10/11 - 21:07:14 | 201 |    2.355385ms |       127.0.0.1 | POST     "/api/v1/did/register"
+2025/10/11 21:11:44 区块链注册失败，但DID已在内存中注册: did:qlink:x9Z66GETEqNh7nlVZvGYUqhNAfg9ye0A, 错误: 区块链未连接
+[GIN] 2025/10/11 - 21:11:44 | 201 |    1.069509ms |       127.0.0.1 | POST     "/api/v1/did/register"

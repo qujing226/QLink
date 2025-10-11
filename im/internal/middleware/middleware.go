@@ -51,19 +51,15 @@ func Recovery() gin.HandlerFunc {
 
 // CORS 跨域中间件
 func CORS() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		origin := c.Request.Header.Get("Origin")
-		
-		// 在生产环境中应该配置允许的域名列表
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://localhost:5173",
-			"http://localhost:8080",
-			"http://127.0.0.1:3000",
-			"http://127.0.0.1:5173",
-			"http://127.0.0.1:8080",
-		}
-		
+    return func(c *gin.Context) {
+        origin := c.Request.Header.Get("Origin")
+        
+        // 仅允许前端开发端口 5173
+        allowedOrigins := []string{
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        }
+
 		allowed := false
 		for _, allowedOrigin := range allowedOrigins {
 			if origin == allowedOrigin {
@@ -71,15 +67,24 @@ func CORS() gin.HandlerFunc {
 				break
 			}
 		}
-		
-		if allowed {
-			c.Header("Access-Control-Allow-Origin", origin)
-		}
-		
+
+		// 为了避免缓存导致的跨域判定异常，明确声明 Vary 头
+		c.Header("Vary", "Origin")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Accept")
+		c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Max-Age", "86400")
+
+		if !allowed {
+			// 对非允许来源进行严格拒绝：预检与实际请求都返回403
+			if c.Request.Method == "OPTIONS" || origin != "" {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+		} else {
+			// 允许来源，显式返回对应的 Allow-Origin
+			c.Header("Access-Control-Allow-Origin", origin)
+		}
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -87,7 +92,7 @@ func CORS() gin.HandlerFunc {
 		}
 
 		c.Next()
-	}
+    }
 }
 
 // Auth 认证中间件

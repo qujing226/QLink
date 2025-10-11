@@ -5,7 +5,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-mkdir -p logs .pids
+mkdir -p data .pids
+
+echo "Building qlink-node binary..."
+GO111MODULE=on go build -o ./bin/qlink-node ./cmd/qlink-node
 
 declare -A CONFIGS
 CONFIGS[gateway]="./config/gateway_node.yaml"
@@ -16,7 +19,7 @@ CONFIGS[node3]="./config/consensus_node3.yaml"
 for name in "${!CONFIGS[@]}"; do
   cfg="${CONFIGS[$name]}"
   echo "Starting $name with $cfg ..."
-  ./bin/qlink-node --config "$cfg" > "logs/${name}.log" 2>&1 &
+  ./bin/qlink-node --config "$cfg" > "data/${name}.log" 2>&1 &
   echo $! > ".pids/${name}.pid"
 done
 
@@ -31,4 +34,4 @@ curl -sS -X POST http://localhost:8080/api/v1/node/peers -H 'Content-Type: appli
 echo "Cluster status:"
 curl -sS http://localhost:8080/api/v1/cluster/status || true
 
-echo "Done. Logs in ./did-system/logs"
+echo "Done. Logs in ./did-system/data"

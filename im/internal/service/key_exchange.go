@@ -11,10 +11,11 @@ import (
 )
 
 type KeyExchangeService interface {
-	InitiateKeyExchange(fromDID, toDID, ciphertext string) (*models.KeyExchange, error)
-	CompleteKeyExchange(userDID, keyExchangeID string) error
-	GetPendingKeyExchanges(userDID string) ([]*models.KeyExchange, error)
-	GenerateSharedKey(fromDID, toDID string) ([]byte, error)
+    InitiateKeyExchange(fromDID, toDID, ciphertext string) (*models.KeyExchange, error)
+    CompleteKeyExchange(userDID, keyExchangeID string) error
+    GetPendingKeyExchanges(userDID string) ([]*models.KeyExchange, error)
+    // 生成共享密钥（当前版本不再使用 Kyber，改为确定性派生）
+    GenerateSharedKey(fromDID, toDID string) ([]byte, error)
 }
 
 type keyExchangeService struct {
@@ -113,18 +114,13 @@ func (s *keyExchangeService) GetPendingKeyExchanges(userDID string) ([]*models.K
 	return s.storage.GetPendingKeyExchanges(userDID)
 }
 
-// GenerateSharedKey 生成共享密钥（使用Kyber768解封装）
+// GenerateSharedKey 生成共享密钥（确定性派生，不依赖 Kyber）
 func (s *keyExchangeService) GenerateSharedKey(fromDID, toDID string) ([]byte, error) {
-	// TODO: 实现真正的Kyber768密钥解封装
-	// 1. 从存储中获取接收方的Kyber768私钥
-	// 2. 从KeyExchange记录中获取发送方的Kyber768密文
-	// 3. 使用Kyber768解封装算法生成共享密钥
-	
-	// 当前为简化实现，实际部署时需要集成真正的Kyber768库
-	// 这里使用两个DID的组合作为种子生成密钥，确保通信加密的一致性
-	seed := fmt.Sprintf("kyber768:%s:%s", fromDID, toDID)
-	
-	// 使用SHA256确保密钥长度为32字节（AES-256要求）
-	hash := sha256.Sum256([]byte(seed))
-	return hash[:], nil
+    // 使用两个 DID 的组合作为种子生成共享密钥，确保通信加密的一致性
+    // 注意：这是演示用的确定性派生方式，生产环境请替换为安全的密钥协商协议（例如 X25519 或 PQC 方案）
+    seed := fmt.Sprintf("qlink-shared:%s:%s", fromDID, toDID)
+
+    // 使用 SHA-256 确保密钥长度为 32 字节（适配 AES-256）
+    hash := sha256.Sum256([]byte(seed))
+    return hash[:], nil
 }

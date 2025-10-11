@@ -59,20 +59,7 @@ go build ./...
 
 ### 运行节点（推荐）
 
-请使用上方“快速使用”中的 `make gateway` 或 `make cluster`，它会自动输出日志位置并注册对等节点，避免手动管理多个终端与端口。
-
-### 使用CLI工具
-
-```bash
-# 创建DID
-./bin/qlink-cli did create --method "example"
-
-# 查询DID
-./bin/qlink-cli did resolve --did "did:example:123456"
-
-# 查看共识状态
-./bin/qlink-cli consensus status
-```
+仅支持通过 `make` 命令启动与停止（`make gateway`、`make cluster`、`make stop`）。命令行工具与相关入口已移除。
 
 ## 📖 文档
 
@@ -86,9 +73,8 @@ go build ./...
 
 ```
 QLink/
-├── cmd/                    # 命令行工具
-│   ├── qlink-cli/         # 客户端工具
-│   └── qlink-node/        # 节点程序
+├── cmd/                    # 可执行入口
+│   └── qlink-node/        # 节点程序（通过 make 调用）
 ├── pkg/                   # 核心包
 │   ├── api/              # API服务
 │   ├── blockchain/       # 区块链实现
@@ -190,7 +176,7 @@ func (p *MyPlugin) Initialize(config map[string]interface{}) error {
 - **对称加密**: AES-256
 - **非对称加密**: RSA-2048, ECDSA
 - **哈希算法**: SHA-256, SHA-3
-- **后量子加密**: Kyber, Dilithium
+- **后量子加密**: 暂不支持（已移除文档与示例中的 Kyber）
 
 ### 安全机制
 - 数字签名验证
@@ -377,10 +363,9 @@ cmd/qlink/main.go (主入口)
 ├── did/network/ (网络模块)
 │   └── p2p.go (P2P 网络)
 ├── did/crypto/ (加密模块)
-│   └── hybrid.go (混合加密)
+│   └── hybrid.go (ECDSA 密钥与签名)
 ├── did/types/ (通用类型)
-└── cmd/qlink-cli/main.go (命令行工具)
-    └── cmd/qlink-node/main.go (节点启动器)
+└── cmd/qlink-node/main.go (节点启动器)
 ```
 
 ---
@@ -842,199 +827,18 @@ USER qlink
 # 端口暴露
 EXPOSE 8080 8081 9090
 
-# 健康检查
+# 健康检查（改为 HTTP 端点示例，移除 CLI 依赖）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD ./qlink-cli health || exit 1
+    CMD curl -fsS http://localhost:8080/health || exit 1
 
 # 启动命令
 CMD ["./qlink-node", "--config", "./config/config.yaml"]
 ```
 
-#### Docker Compose 集群部署
+#### 容器部署说明
 
-```yaml
-version: '3.8'
-
-services:
-  # 主节点
-  qlink-node1:
-    build: .
-    container_name: qlink-node1
-    hostname: qlink-node1
-    ports:
-      - "8080:8080"   # HTTP API
-      - "8081:8081"   # gRPC
-      - "9090:9090"   # 监控
-    environment:
-      - NODE_ID=node1
-      - NODE_TYPE=primary
-      - CLUSTER_PEERS=qlink-node2:8081,qlink-node3:8081
-    volumes:
-      - node1_data:/home/qlink/data
-      - node1_logs:/home/qlink/logs
-      - ./config/node1.yaml:/home/qlink/config/config.yaml
-    networks:
-      - qlink-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "./qlink-cli", "health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # 副本节点
-  qlink-node2:
-    build: .
-    container_name: qlink-node2
-    hostname: qlink-node2
-    ports:
-      - "8082:8080"
-      - "8083:8081"
-      - "9091:9090"
-    environment:
-      - NODE_ID=node2
-      - NODE_TYPE=replica
-      - CLUSTER_PEERS=qlink-node1:8081,qlink-node3:8081
-    volumes:
-      - node2_data:/home/qlink/data
-      - node2_logs:/home/qlink/logs
-      - ./config/node2.yaml:/home/qlink/config/config.yaml
-    networks:
-      - qlink-network
-    restart: unless-stopped
-    depends_on:
-      - qlink-node1
-
-  qlink-node3:
-    build: .
-    container_name: qlink-node3
-    hostname: qlink-node3
-    ports:
-      - "8084:8080"
-      - "8085:8081"
-      - "9092:9090"
-    environment:
-      - NODE_ID=node3
-      - NODE_TYPE=replica
-      - CLUSTER_PEERS=qlink-node1:8081,qlink-node2:8081
-    volumes:
-      - node3_data:/home/qlink/data
-      - node3_logs:/home/qlink/logs
-      - ./config/node3.yaml:/home/qlink/config/config.yaml
-    networks:
-      - qlink-network
-    restart: unless-stopped
-    depends_on:
-      - qlink-node1
-
-  # 负载均衡器
-  nginx:
-    image: nginx:alpine
-    container_name: qlink-lb
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./config/nginx.conf:/etc/nginx/nginx.conf
-    networks:
-      - qlink-network
-    depends_on:
-      - qlink-node1
-      - qlink-node2
-      - qlink-node3
-    restart: unless-stopped
-
-volumes:
-  node1_data:
-  node1_logs:
-  node2_data:
-  node2_logs:
-  node3_data:
-  node3_logs:
-
-networks:
-  qlink-network:
-    driver: bridge
-```
-
-### Nginx 负载均衡配置
-
-```nginx
-upstream qlink_backend {
-    least_conn;
-    server qlink-node1:8080 weight=3 max_fails=3 fail_timeout=30s;
-    server qlink-node2:8080 weight=2 max_fails=3 fail_timeout=30s;
-    server qlink-node3:8080 weight=2 max_fails=3 fail_timeout=30s;
-}
-
-server {
-    listen 80;
-    server_name localhost;
-
-    # API 代理
-    location /api/ {
-        proxy_pass http://qlink_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # 超时设置
-        proxy_connect_timeout 30s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
-        
-        # 重试设置
-        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
-        proxy_next_upstream_tries 3;
-        proxy_next_upstream_timeout 30s;
-    }
-
-    # DID 解析端点
-    location ~ ^/did/(.+)$ {
-        proxy_pass http://qlink_backend/api/v1/did/$1;
-        
-        # 缓存设置
-        proxy_cache_valid 200 1h;
-        proxy_cache_valid 404 1m;
-        add_header X-Cache-Status $upstream_cache_status;
-    }
-
-    # 监控端点
-    location /metrics {
-        proxy_pass http://qlink_backend/metrics;
-        
-        # 限制访问
-        allow 172.20.0.0/16;
-        deny all;
-    }
-}
-```
-
-### 部署命令
-
-```bash
-# 1. 构建镜像
-docker-compose build
-
-# 2. 启动集群
-docker-compose up -d
-
-# 3. 查看状态
-docker-compose ps
-
-# 4. 查看日志
-docker-compose logs -f qlink-node1
-
-# 5. 扩容节点
-docker-compose up -d --scale qlink-node2=2
-
-# 6. 停止集群
-docker-compose down
-
-# 7. 清理数据
-docker-compose down -v
-```
+- 本 README 不再内嵌 Docker Compose 与 Nginx 的大段示例，以减少与代码漂移的风险。
+- 请参考 `docs/DEPLOYMENT.md` 获取最新的容器化与集群部署指引（包含 Compose、Kubernetes 与负载均衡示例）。
 
 ---
 
@@ -1842,56 +1646,45 @@ echo "Rolling update completed"
 
 ### 自定义共识算法
 
-#### 1. 实现共识接口
+#### 1. 实现统一接口
+
+实现 `pkg/interfaces.ConsensusAlgorithm` 接口（统一签名）：
 
 ```go
-// 定义共识接口
+// 统一的共识算法接口（参考 pkg/interfaces/consensus.go）
 type ConsensusAlgorithm interface {
     Start(ctx context.Context) error
     Stop() error
-    Propose(operation *Operation) error
-    GetStatus() *ConsensusStatus
+    Submit(proposal interface{}) error
+    GetStatus() map[string]interface{}
     GetLeader() string
-    GetNodes() []*NodeInfo
+    GetNodes() []string
 }
 
-// 实现自定义算法
+// 示例：自定义算法骨架
 type CustomConsensus struct {
     nodeID string
     config *ConsensusConfig
-    // 自定义字段
 }
 
 func NewCustomConsensus(nodeID string, config *ConsensusConfig) *CustomConsensus {
-    return &CustomConsensus{
-        nodeID: nodeID,
-        config: config,
-    }
+    return &CustomConsensus{nodeID: nodeID, config: config}
 }
 
-func (c *CustomConsensus) Start(ctx context.Context) error {
-    // 实现启动逻辑
-    return nil
-}
-
-func (c *CustomConsensus) Propose(operation *Operation) error {
-    // 实现提案逻辑
-    return nil
-}
-
-// 其他接口方法...
+func (c *CustomConsensus) Start(ctx context.Context) error { return nil }
+func (c *CustomConsensus) Stop() error { return nil }
+func (c *CustomConsensus) Submit(proposal interface{}) error { return nil }
+func (c *CustomConsensus) GetStatus() map[string]interface{} { return map[string]interface{}{"healthy": true} }
+func (c *CustomConsensus) GetLeader() string { return c.nodeID }
+func (c *CustomConsensus) GetNodes() []string { return []string{c.nodeID} }
 ```
 
-#### 2. 注册算法
+#### 2. 集成与切换
 
-```go
-// 在 consensus/integration.go 中注册
-func init() {
-    RegisterConsensusAlgorithm("custom", func(nodeID string, config *ConsensusConfig) ConsensusAlgorithm {
-        return NewCustomConsensus(nodeID, config)
-    })
-}
-```
+当前切换器支持 `Raft` 与 `PoA`。如需扩展新的类型：
+- 在 `pkg/interfaces/consensus.go` 的 `ConsensusType` 中添加新枚举值；
+- 在 `pkg/consensus/switcher.go` 的 `getConsensusAlgorithm` 与相关逻辑中接入新的实现；
+- 更新文档与测试，确保与统一接口兼容。
 
 ### 自定义存储后端
 

@@ -1,18 +1,16 @@
 package storage
 
 import (
-	"fmt"
-
-	"github.com/qujing226/QLink/pkg/interfaces"
+    "fmt"
+    "github.com/qujing226/QLink/pkg/interfaces"
 )
 
 // StorageType 存储类型
 type StorageType string
 
 const (
-	StorageTypeMemory     StorageType = "memory"
-	StorageTypeBlockchain StorageType = "blockchain"
-	StorageTypeDID        StorageType = "did"
+    StorageTypeBlockchain StorageType = "blockchain"
+    StorageTypeDID        StorageType = "did"
 )
 
 // StorageFactory 存储工厂实现
@@ -25,78 +23,62 @@ func NewStorageFactory() *StorageFactory {
 
 // CreateStorage 创建存储实例
 func (sf *StorageFactory) CreateStorage(storageType StorageType, config interfaces.StorageConfig) (interfaces.Storage, error) {
-	switch storageType {
-	case StorageTypeMemory:
-		return sf.createMemoryStorage(config)
-	case StorageTypeBlockchain:
-		return sf.createBlockchainStorage(config)
-	case StorageTypeDID:
-		return sf.createDIDStorage(config)
-	default:
-		return nil, fmt.Errorf("不支持的存储类型: %s", storageType)
-	}
-}
-
-// createMemoryStorage 创建内存存储
-func (sf *StorageFactory) createMemoryStorage(config interfaces.StorageConfig) (interfaces.Storage, error) {
-	return NewMemoryStorage(), nil
+    switch storageType {
+    case StorageTypeBlockchain:
+        return sf.createBlockchainStorage(config)
+    case StorageTypeDID:
+        return sf.createDIDStorage(config)
+    default:
+        return nil, fmt.Errorf("不支持的存储类型: %s", storageType)
+    }
 }
 
 // createBlockchainStorage 创建区块链存储
 func (sf *StorageFactory) createBlockchainStorage(config interfaces.StorageConfig) (interfaces.Storage, error) {
-	// 创建底层存储
-	baseStorage := NewMemoryStorage()
+    // 创建底层存储
+    baseStorage := NewLocalStorage(getDataDir())
 
-	// 创建区块链存储
-	blockchainStorage := NewBlockchainStorage(baseStorage)
+    // 创建区块链存储
+    blockchainStorage := NewBlockchainStorage(baseStorage)
 
-	return blockchainStorage, nil
+    return blockchainStorage, nil
 }
 
 // createDIDStorage 创建DID存储
 func (sf *StorageFactory) createDIDStorage(config interfaces.StorageConfig) (interfaces.Storage, error) {
-	// 创建底层存储
-	baseStorage := NewMemoryStorage()
+    // 创建底层存储
+    baseStorage := NewLocalStorage(getDataDir())
 
-	// 创建DID存储
-	didStorage := NewDIDStorage(baseStorage)
+    // 创建DID存储
+    didStorage := NewDIDStorage(baseStorage)
 
-	return didStorage, nil
+    return didStorage, nil
 }
 
 // GetSupportedTypes 获取支持的存储类型
 func (sf *StorageFactory) GetSupportedTypes() []StorageType {
-	return []StorageType{
-		StorageTypeMemory,
-		StorageTypeBlockchain,
-		StorageTypeDID,
-	}
+    return []StorageType{
+        StorageTypeBlockchain,
+        StorageTypeDID,
+    }
 }
 
 // ValidateConfig 验证存储配置
 func (sf *StorageFactory) ValidateConfig(storageType StorageType, config interfaces.StorageConfig) error {
-	switch storageType {
-	case StorageTypeMemory:
-		return sf.validateMemoryConfig(config)
-	case StorageTypeBlockchain:
-		return sf.validateBlockchainConfig(config)
-	case StorageTypeDID:
-		return sf.validateDIDConfig(config)
-	default:
-		return fmt.Errorf("不支持的存储类型: %s", storageType)
-	}
-}
-
-// validateMemoryConfig 验证内存存储配置
-func (sf *StorageFactory) validateMemoryConfig(config interfaces.StorageConfig) error {
-	// 内存存储不需要特殊配置验证
-	return nil
+    switch storageType {
+    case StorageTypeBlockchain:
+        return sf.validateBlockchainConfig(config)
+    case StorageTypeDID:
+        return sf.validateDIDConfig(config)
+    default:
+        return fmt.Errorf("不支持的存储类型: %s", storageType)
+    }
 }
 
 // validateBlockchainConfig 验证区块链存储配置
 func (sf *StorageFactory) validateBlockchainConfig(config interfaces.StorageConfig) error {
-	// 区块链存储配置验证
-	return nil
+    // 区块链存储配置验证
+    return nil
 }
 
 // validateDIDConfig 验证DID存储配置
@@ -202,21 +184,23 @@ func (sf *StorageFactory) CreateStorageManager(configs map[string]FactoryStorage
 
 // CreateDefaultStorageManager 创建默认存储管理器
 func (sf *StorageFactory) CreateDefaultStorageManager() (*StorageManager, error) {
-	// 创建默认存储配置
-	configs := map[string]FactoryStorageConfig{
-		"memory": {
-			Type:   StorageTypeMemory,
-			Config: NewDefaultStorageConfig(string(StorageTypeMemory)),
-		},
-		"blockchain": {
-			Type:   StorageTypeBlockchain,
-			Config: NewDefaultStorageConfig(string(StorageTypeBlockchain)),
-		},
-		"did": {
-			Type:   StorageTypeDID,
-			Config: NewDefaultStorageConfig(string(StorageTypeDID)),
-		},
-	}
+    // 创建默认存储配置
+    configs := map[string]FactoryStorageConfig{
+        "blockchain": {
+            Type:   StorageTypeBlockchain,
+            Config: NewDefaultStorageConfig(string(StorageTypeBlockchain)),
+        },
+        "did": {
+            Type:   StorageTypeDID,
+            Config: NewDefaultStorageConfig(string(StorageTypeDID)),
+        },
+    }
 
-	return sf.CreateStorageManager(configs)
+return sf.CreateStorageManager(configs)
+}
+
+// getDataDir 返回持久化数据目录（相对 did-system 根目录）
+func getDataDir() string {
+    // 使用用户指定的绝对路径
+    return "/home/peninsula/go/src/QLink/did-system/data"
 }

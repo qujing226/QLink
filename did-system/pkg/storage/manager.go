@@ -156,25 +156,25 @@ func (sm *StorageManager) GetStorageStats() map[string]interfaces.StorageStats {
 
 // CreateDefaultStorages 创建默认存储实例
 func (sm *StorageManager) CreateDefaultStorages() error {
-	// 创建内存存储
-	memoryStorage := NewMemoryStorage()
-	if err := sm.RegisterStorage("memory", memoryStorage); err != nil {
-		return fmt.Errorf("注册内存存储失败: %w", err)
-	}
+    // 创建持久化本地存储作为统一底层
+    localStorage := NewLocalStorage(getDataDir())
+    if err := sm.RegisterStorage("local", localStorage); err != nil {
+        return fmt.Errorf("注册本地存储失败: %w", err)
+    }
 
-	// 创建区块链存储
-	blockchainStorage := NewBlockchainStorage(memoryStorage)
-	if err := sm.RegisterStorage("blockchain", blockchainStorage); err != nil {
-		return fmt.Errorf("注册区块链存储失败: %w", err)
-	}
+    // 创建区块链存储
+    blockchainStorage := NewBlockchainStorage(localStorage)
+    if err := sm.RegisterStorage("blockchain", blockchainStorage); err != nil {
+        return fmt.Errorf("注册区块链存储失败: %w", err)
+    }
 
-	// 创建DID存储
-	didStorage := NewDIDStorage(memoryStorage)
-	if err := sm.RegisterStorage("did", didStorage); err != nil {
-		return fmt.Errorf("注册DID存储失败: %w", err)
-	}
+    // 创建DID存储
+    didStorage := NewDIDStorage(localStorage)
+    if err := sm.RegisterStorage("did", didStorage); err != nil {
+        return fmt.Errorf("注册DID存储失败: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // GetBlockchainStorage 获取区块链存储
@@ -209,31 +209,17 @@ func (sm *StorageManager) GetDIDStorage() (*DIDStorage, error) {
 
 // BackupStorage 备份存储数据
 func (sm *StorageManager) BackupStorage(name string, backupPath string) error {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
+    sm.mu.RLock()
+    defer sm.mu.RUnlock()
 
-	storage, exists := sm.storages[name]
-	if !exists {
-		return fmt.Errorf("存储不存在: %s", name)
-	}
+    _, exists := sm.storages[name]
+    if !exists {
+        return fmt.Errorf("存储不存在: %s", name)
+    }
 
-	// 创建备份存储
-	backupStorage := NewMemoryStorage()
-
-	// 复制数据
-	iter := storage.Iterator([]byte(""))
-	defer iter.Close()
-
-	for iter.First(); iter.Valid(); iter.Next() {
-		if err := backupStorage.Put(iter.Key(), iter.Value()); err != nil {
-			return fmt.Errorf("备份数据失败: %w", err)
-		}
-	}
-
-	// TODO: 将备份存储持久化到文件系统
-	// 这里可以根据需要实现文件系统持久化逻辑
-
-	return nil
+    // TODO: 将备份数据直接写入文件系统
+    // 暂时不实现内存备份，返回未实现
+    return fmt.Errorf("备份功能尚未实现")
 }
 
 // RestoreStorage 恢复存储数据

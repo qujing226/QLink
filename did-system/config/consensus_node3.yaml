@@ -71,7 +71,7 @@ sync:
 logging:
   level: "info"
   format: "json"
-  output: "./logs/consensus3.log"
+  output: "./data/consensus3.log"
   max_size: 100
   max_backups: 3
   max_age: 7

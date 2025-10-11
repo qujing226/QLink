@@ -94,21 +94,21 @@ type RequestVoteResponse struct {
 
 // NewRaftNode 创建新的Raft节点
 func NewRaftNode(id string, p2pNetwork *network.P2PNetwork) *RaftNode {
-	return &RaftNode{
-		id:                id,
-		peers:             make(map[string]*PeerConnection),
-		State:             Follower,
-		term:              0,
-		log:               make([]LogEntry, 0),
-		nextIndex:         make(map[string]int64),
-		matchIndex:        make(map[string]int64),
-		electionTimeout:   time.Duration(150+rand.Intn(150)) * time.Millisecond,
-		heartbeatInterval: 50 * time.Millisecond,
-		p2pNetwork:        p2pNetwork,
-		appendEntriesCh:   make(chan *AppendEntriesRequest, 100),
-		requestVoteCh:     make(chan *RequestVoteRequest, 100),
-		stopCh:            make(chan struct{}),
-	}
+    return &RaftNode{
+        id:                id,
+        peers:             make(map[string]*PeerConnection),
+        State:             Follower,
+        term:              0,
+        log:               make([]LogEntry, 0),
+        nextIndex:         make(map[string]int64),
+        matchIndex:        make(map[string]int64),
+        electionTimeout:   time.Duration(150+rand.Intn(150)) * time.Millisecond,
+        heartbeatInterval: 50 * time.Millisecond,
+        p2pNetwork:        p2pNetwork,
+        appendEntriesCh:   make(chan *AppendEntriesRequest, 100),
+        requestVoteCh:     make(chan *RequestVoteRequest, 100),
+        stopCh:            make(chan struct{}),
+    }
 }
 
 // Start 启动Raft节点
@@ -126,8 +126,33 @@ func (rn *RaftNode) Start(ctx context.Context) error {
 
 // Stop 停止Raft节点
 func (rn *RaftNode) Stop() error {
-	close(rn.stopCh)
-	return nil
+    close(rn.stopCh)
+    return nil
+}
+
+// GetNodes 获取节点列表（包含自身及已知的对等节点）
+func (rn *RaftNode) GetNodes() []string {
+    rn.mu.RLock()
+    defer rn.mu.RUnlock()
+
+    nodes := make([]string, 0, len(rn.peers)+1)
+    // 包含自身节点ID
+    nodes = append(nodes, rn.id)
+    for id := range rn.peers {
+        nodes = append(nodes, id)
+    }
+    return nodes
+}
+
+// GetLeader 获取当前领导者（若本节点为领导者，则返回自身ID，否则返回空字符串）
+func (rn *RaftNode) GetLeader() string {
+    rn.mu.RLock()
+    defer rn.mu.RUnlock()
+
+    if rn.State == Leader {
+        return rn.id
+    }
+    return ""
 }
 
 // AddPeer 添加对等节点

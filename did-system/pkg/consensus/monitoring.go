@@ -1,11 +1,12 @@
 package consensus
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"sync"
-	"time"
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+    "github.com/qujing226/QLink/pkg/interfaces"
 )
 
 // ConsensusMonitor 共识监控器
@@ -22,8 +23,8 @@ type ConsensusMonitor struct {
 	// 恢复机制
 	recoveryManager *RecoveryManager
 
-	// 共识算法实例
-	consensus ConsensusAlgorithm
+    // 共识算法实例（统一接口）
+    consensus interfaces.ConsensusAlgorithm
 
 	// 控制
 	mu     sync.RWMutex

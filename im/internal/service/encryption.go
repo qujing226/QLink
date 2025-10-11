@@ -138,15 +138,17 @@ func (s *encryptionService) GetOrCreateSession(userDID, friendDID string) (*mode
 		return session, nil
 	}
 
-	// 如果没有现有会话，检查是否有已完成的密钥交换
-	keyExchange, err := s.storage.GetCompletedKeyExchange(userDID, friendDID)
+    // 如果没有现有会话，检查是否有已完成的密钥交换
+    _, err = s.storage.GetCompletedKeyExchange(userDID, friendDID)
 	if err != nil {
 		return nil, fmt.Errorf("no completed key exchange found: %w", err)
 	}
 
-	// 从密钥交换中获取共享密钥（这里需要实现从ciphertext中解封装共享密钥的逻辑）
-	// 这是一个简化的实现，实际应该使用Kyber768解封装
-	sharedKey := []byte(keyExchange.Ciphertext) // 简化处理
+    // 从双方 DID 确定性派生共享密钥（当前版本不依赖 Kyber）
+    // 注意：这是演示实现，生产环境建议替换为安全密钥协商协议
+    seed := "qlink-shared:" + userDID + ":" + friendDID
+    sum := sha256.Sum256([]byte(seed))
+    sharedKey := sum[:]
 	
 	// 派生会话密钥
 	sessionKey := s.DeriveSessionKey(sharedKey, userDID, friendDID)

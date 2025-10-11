@@ -1,11 +1,12 @@
 package did
 
 import (
-	"fmt"
-	"time"
+    "encoding/hex"
+    "fmt"
+    "time"
 
-	"github.com/qujing226/QLink/did/crypto"
-	"github.com/qujing226/QLink/pkg/types"
+    "github.com/qujing226/QLink/did/crypto"
+    "github.com/qujing226/QLink/pkg/types"
 )
 
 // DIDDocumentBuilder DID文档构建器
@@ -14,13 +15,13 @@ type DIDDocumentBuilder struct {
 	did     string
 }
 
-// NewDIDDocumentBuilder 创建DID文档构建器
+// NewDIDDocumentBuilder 创建DID文档构建器（使用 ECDSA 密钥对）
 func NewDIDDocumentBuilder() (*DIDDocumentBuilder, error) {
-	// 生成混合密钥对
-	keyPair, err := crypto.GenerateHybridKeyPair()
-	if err != nil {
-		return nil, fmt.Errorf("生成密钥对失败: %w", err)
-	}
+    // 生成密钥对（ECDSA）
+    keyPair, err := crypto.GenerateHybridKeyPair()
+    if err != nil {
+        return nil, fmt.Errorf("生成密钥对失败: %w", err)
+    }
 
 	// 从密钥对生成DID
 	did, err := crypto.GenerateDIDFromKeyPair(keyPair)
@@ -34,13 +35,13 @@ func NewDIDDocumentBuilder() (*DIDDocumentBuilder, error) {
 	}, nil
 }
 
-// NewDIDDocumentBuilderFromKeyPair 从现有密钥对创建DID文档构建器
+// NewDIDDocumentBuilderFromKeyPair 从现有密钥对创建DID文档构建器（ECDSA）
 func NewDIDDocumentBuilderFromKeyPair(keyPair *crypto.HybridKeyPair) (*DIDDocumentBuilder, error) {
-	// 从密钥对生成DID
-	did, err := crypto.GenerateDIDFromKeyPair(keyPair)
-	if err != nil {
-		return nil, fmt.Errorf("生成DID失败: %w", err)
-	}
+    // 从密钥对生成DID
+    did, err := crypto.GenerateDIDFromKeyPair(keyPair)
+    if err != nil {
+        return nil, fmt.Errorf("生成DID失败: %w", err)
+    }
 
 	return &DIDDocumentBuilder{
 		keyPair: keyPair,
@@ -103,19 +104,19 @@ func (builder *DIDDocumentBuilder) GetKeyPair() *crypto.HybridKeyPair {
 	return builder.keyPair
 }
 
-// SignDocument 对DID文档进行签名
+// SignDocument 对DID文档进行签名（ECDSA）
 func (builder *DIDDocumentBuilder) SignDocument(doc *types.DIDDocument) error {
-	// 序列化文档用于签名
-	docData, err := doc.ToJSON()
-	if err != nil {
-		return fmt.Errorf("序列化文档失败: %w", err)
-	}
+    // 序列化文档用于签名
+    docData, err := doc.ToJSON()
+    if err != nil {
+        return fmt.Errorf("序列化文档失败: %w", err)
+    }
 
-	// 使用混合密钥对文档进行签名
-	signature, err := builder.keyPair.Sign(docData)
-	if err != nil {
-		return fmt.Errorf("签名失败: %w", err)
-	}
+    // 使用 ECDSA 密钥对文档进行签名
+    signature, err := builder.keyPair.Sign(docData)
+    if err != nil {
+        return fmt.Errorf("签名失败: %w", err)
+    }
 
 	// 创建证明
 	proof := &types.Proof{
@@ -130,11 +131,11 @@ func (builder *DIDDocumentBuilder) SignDocument(doc *types.DIDDocument) error {
 	return nil
 }
 
-// VerifyDocument 验证DID文档签名
+// VerifyDocument 验证DID文档签名（ECDSA）
 func VerifyDocument(doc *types.DIDDocument, keyPair *crypto.HybridKeyPair) error {
-	if doc.Proof == nil {
-		return fmt.Errorf("文档没有证明")
-	}
+    if doc.Proof == nil {
+        return fmt.Errorf("文档没有证明")
+    }
 
 	// 临时移除证明进行验证
 	originalProof := doc.Proof
@@ -150,18 +151,19 @@ func VerifyDocument(doc *types.DIDDocument, keyPair *crypto.HybridKeyPair) error
 	// 恢复证明
 	doc.Proof = originalProof
 
-	// 解析签名
-	signatureBytes := []byte(originalProof.ProofValue) // 使用ProofValue字段而不是Jws
-	signature := &crypto.HybridSignature{
-		ECDSASignature: signatureBytes,
-	}
+    // 解析签名（ProofValue 为十六进制编码的 DER ASN.1 签名）
+    signatureBytes, err := hex.DecodeString(originalProof.ProofValue)
+    if err != nil {
+        return fmt.Errorf("签名格式无效: %w", err)
+    }
+    signature := &crypto.HybridSignature{ECDSASignature: signatureBytes}
 
 	// 验证签名
 	if !keyPair.Verify(docData, signature) {
 		return fmt.Errorf("签名验证失败")
 	}
 
-	return nil
+    return nil
 }
 
 // CreateRegistrationRequest 创建DID注册请求

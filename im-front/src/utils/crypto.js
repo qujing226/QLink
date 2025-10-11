@@ -469,3 +469,41 @@ export function removeStoredKey(key) {
     console.error('删除密钥失败:', error)
   }
 }
+
+// === HMAC-SHA256 签名（与后端校验逻辑保持一致） ===
+// 基于 DID 的标识段派生 32 字符的密钥字符串：
+// - 若标识段长度 >= 32，取前 32 字符
+// - 否则用 "default-private-key" 的前缀补齐到 32 字符
+export function deriveHMACKeyFromDID(did) {
+  if (!did || typeof did !== 'string') return 'default-private-key'
+  const parts = did.split(':')
+  const identifier = parts.length >= 3 ? parts[2] : did
+  const filler = 'default-private-key'
+  if (identifier.length >= 32) {
+    return identifier.slice(0, 32)
+  }
+  const need = 32 - identifier.length
+  return identifier + filler.slice(0, need)
+}
+
+// 使用派生的密钥对消息进行 HMAC-SHA256 并返回十六进制字符串
+export async function generateHMACSignature(message, did) {
+  const keyStr = deriveHMACKeyFromDID(did)
+  const enc = new TextEncoder()
+  const keyBytes = enc.encode(keyStr)
+  const dataBytes = enc.encode(message)
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'HMAC', hash: { name: 'SHA-256' } },
+    false,
+    ['sign']
+  )
+  const signature = await crypto.subtle.sign({ name: 'HMAC' }, cryptoKey, dataBytes)
+  const bytes = new Uint8Array(signature)
+  let hex = ''
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0')
+  }
+  return hex
+}

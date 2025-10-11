@@ -34,7 +34,6 @@ func NewRouter(authService service.AuthService, friendService service.FriendServ
 		v1.POST("/auth/login", authHandler.Login)
 		v1.POST("/auth/challenge", authHandler.CreateChallenge)
 		v1.POST("/auth/verify", authHandler.VerifyChallenge)
-		v1.GET("/auth/lattice-pubkey/:did", authHandler.GetLatticePublicKey)
 
 		// WebSocket连接
 		v1.GET("/ws", func(c *gin.Context) {

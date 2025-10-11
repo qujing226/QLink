@@ -17,6 +17,7 @@ const (
     ConsensusTypeRaft ConsensusType = iota
     ConsensusTypePoA
     ConsensusTypePBFT
+    ConsensusTypePoS
 )
 ```
 
@@ -29,7 +30,7 @@ const (
 
 ```go
 type ConsensusAlgorithm interface {
-    Start() error
+    Start(ctx context.Context) error
     Stop() error
     Submit(proposal interface{}) error
     GetStatus() map[string]interface{}
@@ -62,9 +63,9 @@ type ConsensusEngine interface {
 
 ```go
 type ConsensusFactory interface {
-    CreateConsensus(consensusType ConsensusType, config map[string]interface{}) (ConsensusAlgorithm, error)
+    CreateConsensus(consensusType ConsensusType, config interface{}) (ConsensusAlgorithm, error)
     GetSupportedTypes() []ConsensusType
-    ValidateConfig(consensusType ConsensusType, config map[string]interface{}) error
+    ValidateConfig(consensusType ConsensusType, config interface{}) error
 }
 ```
 
@@ -88,7 +89,7 @@ type Storage interface {
 ```
 
 **用途**: 通用的键值存储接口
-**实现**: LevelDB, BadgerDB, 内存存储等
+**实现**: 本地文件存储、LevelDB、IPFS 等
 
 #### 2.2 BlockchainStorage 接口
 
@@ -129,18 +130,21 @@ type DIDStorage interface {
     PutDIDDocument(did string, doc interface{}) error
     DeleteDIDDocument(did string) error
     
-    // DID状态管理
-    GetDIDStatus(did string) (string, error)
-    SetDIDStatus(did string, status string) error
-    
-    // 查询操作
-    ListDIDs(limit int, offset int) ([]string, error)
-    SearchDIDs(query map[string]interface{}) ([]string, error)
+    // DID历史记录
+    GetDIDHistory(did string) ([]interface{}, error)
+    PutDIDHistory(did string, history interface{}) error
+
+    // DID查询
+    QueryDIDs(query interface{}) ([]string, error)
+
+    // DID统计
+    GetDIDCount() (int64, error)
+    GetDIDsByController(controller string) ([]string, error)
 }
 ```
 
 **用途**: DID专用存储操作
-**实现**: DID文档和状态的存储管理
+**实现**: DID文档与历史的持久化存储与查询统计
 
 ### 3. 插件接口 (plugin.go)
 
@@ -220,34 +224,9 @@ type CryptoProvider interface {
 **用途**: 加密服务提供者接口
 **实现**: 各种加密算法的插件实现
 
-### 4. 适配器接口 (adapter.go)
+### 4. 适配器接口（已弃用）
 
-#### 4.1 ConsensusAdapter 接口
-
-```go
-type ConsensusAdapter interface {
-    GetType() ConsensusType
-    GetName() string
-    
-    StartConsensus() error
-    StopConsensus() error
-    Submit(proposal interface{}) error
-    GetStatus() map[string]interface{}
-    GetLeader() string
-    GetNodes() []string
-    
-    ValidateBlock(block interface{}) error
-    ValidateProposer(proposer string, blockNumber uint64) error
-    GetNextProposer(blockNumber uint64) string
-    IsAuthority(address string) bool
-    GetAuthorities() []string
-}
-```
-
-**用途**: 统一不同共识实现的适配器
-**实现**: 各种共识算法的适配器实现
-
-提示：区块链层已统一使用 `did/blockchain` 下的 `BlockchainInterface`，无需额外适配器。
+历史上的适配器（如 `ConsensusAdapter`）已在共识模块中弃用。当前架构直接使用统一的 `ConsensusAlgorithm` 接口（位于 `pkg/interfaces/consensus.go`）由具体实现（如 `RaftNode`、`PoANode`）提供。区块链层也已统一到 `did/blockchain` 的 `BlockchainInterface`，无需额外适配器。
 
 ## 接口使用指南
 
@@ -259,7 +238,7 @@ type RaftConsensus struct {
     // 内部状态
 }
 
-func (r *RaftConsensus) Start() error {
+func (r *RaftConsensus) Start(ctx context.Context) error {
     // 启动Raft共识
     return nil
 }
@@ -269,6 +248,18 @@ func (r *RaftConsensus) Stop() error {
     return nil
 }
 
+func (r *RaftConsensus) Submit(proposal interface{}) error {
+    // 提交提案
+    return nil
+}
+
+func (r *RaftConsensus) GetStatus() map[string]interface{} {
+    return map[string]interface{}{"healthy": true}
+}
+
+func (r *RaftConsensus) GetLeader() string { return "node1" }
+func (r *RaftConsensus) GetNodes() []string { return []string{"node1", "node2"} }
+ 
 // 实现其他方法...
 ```
 

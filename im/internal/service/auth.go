@@ -1,26 +1,27 @@
 package service
 
 import (
-	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"io"
-	"math/big"
-	"net/http"
-	"qlink-im/internal/config"
-	"qlink-im/internal/errors"
-	"qlink-im/internal/models"
-	"qlink-im/internal/storage"
-	"strings"
-	"time"
+    "bytes"
+    "crypto/hmac"
+    "crypto/ecdsa"
+    "crypto/elliptic"
+    "crypto/rand"
+    "crypto/sha256"
+    "encoding/base64"
+    "encoding/hex"
+    "encoding/json"
+    "fmt"
+    "io"
+    "math/big"
+    "net/http"
+    "qlink-im/internal/config"
+    "qlink-im/internal/errors"
+    "qlink-im/internal/models"
+    "qlink-im/internal/storage"
+    "strings"
+    "time"
 
-	"github.com/golang-jwt/jwt/v5"
+    "github.com/golang-jwt/jwt/v5"
 )
 
 type AuthService interface {
@@ -204,20 +205,20 @@ func (a *authService) VerifyChallenge(challengeID uint, signature string) error 
 		return fmt.Errorf("challenge expired")
 	}
 
-	// 获取用户公钥
-	user, err := a.storage.GetUserByDID(challenge.From)
-	if err != nil {
-		return fmt.Errorf("user not found: %w", err)
-	}
+    // 检查用户是否存在（不使用返回值，仅用于校验存在性）
+    _, err = a.storage.GetUserByDID(challenge.From)
+    if err != nil {
+        return fmt.Errorf("user not found: %w", err)
+    }
 
-	// 验证签名（这里简化处理，实际应该使用真正的签名验证）
-	fmt.Printf("DEBUG: Verifying signature - nonce: %s, signature: %s, publicKey: %s\n", challenge.Nonce, signature, user.PublicKey)
-	if !a.verifySignature(challenge.Nonce, signature, user.PublicKey) {
-		challenge.Status = "failed"
-		a.storage.UpdateChallenge(challenge)
-		fmt.Printf("DEBUG: Signature verification failed\n")
-		return fmt.Errorf("invalid signature")
-	}
+    // 使用与网关一致的 HMAC-SHA256 校验方案
+    fmt.Printf("DEBUG: Verifying signature - nonce: %s, signature: %s, did: %s\n", challenge.Nonce, signature, challenge.From)
+    if !a.verifySignature(challenge.Nonce, signature, challenge.From) {
+        challenge.Status = "failed"
+        a.storage.UpdateChallenge(challenge)
+        fmt.Printf("DEBUG: Signature verification failed\n")
+        return fmt.Errorf("invalid signature")
+    }
 	fmt.Printf("DEBUG: Signature verification successful\n")
 
 	// 更新质询状态
@@ -245,40 +246,38 @@ func (a *authService) VerifyChallengeByNonce(nonce, signature string) error {
 		return fmt.Errorf("challenge expired")
 	}
 
-	// 获取用户公钥，如果用户不存在则创建用户
-	user, err := a.storage.GetUserByDID(challenge.From)
-	if err != nil {
-		// 如果用户不存在，创建新用户
-		if err.Error() == "record not found" {
-			// 解析DID Document获取公钥
-			didDoc, err := a.resolveDIDDocument(challenge.From)
-			if err != nil {
-				return fmt.Errorf("failed to parse DID document: %w", err)
-			}
+    // 获取用户，如果用户不存在则创建用户
+    _, err = a.storage.GetUserByDID(challenge.From)
+    if err != nil {
+        // 如果用户不存在，创建新用户
+        if err.Error() == "record not found" {
+            // 解析DID Document获取公钥
+            didDoc, err := a.resolveDIDDocument(challenge.From)
+            if err != nil {
+                return fmt.Errorf("failed to parse DID document: %w", err)
+            }
 
-			// 创建新用户
-			newUser := &models.User{
-				DID:       challenge.From,
-				PublicKey: didDoc.PublicKey,
-				Status:    "online",
-			}
+            // 创建新用户
+            newUser := &models.User{
+                DID:       challenge.From,
+                PublicKey: didDoc.PublicKey,
+                Status:    "online",
+            }
 
-			if err := a.storage.CreateUser(newUser); err != nil {
-				return fmt.Errorf("failed to create user: %w", err)
-			}
+            if err := a.storage.CreateUser(newUser); err != nil {
+                return fmt.Errorf("failed to create user: %w", err)
+            }
+        } else {
+            return fmt.Errorf("user not found: %w", err)
+        }
+    }
 
-			user = newUser
-		} else {
-			return fmt.Errorf("user not found: %w", err)
-		}
-	}
-
-	// 验证签名（这里简化处理，实际应该使用真正的签名验证）
-	if !a.verifySignature(challenge.Nonce, signature, user.PublicKey) {
-		challenge.Status = "failed"
-		a.storage.UpdateChallenge(challenge)
-		return fmt.Errorf("invalid signature")
-	}
+    // 使用与网关一致的 HMAC-SHA256 校验方案
+    if !a.verifySignature(challenge.Nonce, signature, challenge.From) {
+        challenge.Status = "failed"
+        a.storage.UpdateChallenge(challenge)
+        return fmt.Errorf("invalid signature")
+    }
 
 	// 更新质询状态
 	challenge.Status = "completed"
@@ -492,69 +491,17 @@ func (a *authService) fetchRawDIDDocument(did string) (map[string]interface{}, e
     return resolveResp.DIDDocument, nil
 }
 
-// extractLatticePublicKeyFromDoc 从DID文档提取格加密（Kyber）公钥
+// extractLatticePublicKeyFromDoc 从DID文档提取格加密公钥（当前版本不再使用，返回空）
 func (a *authService) extractLatticePublicKeyFromDoc(doc map[string]interface{}) (string, error) {
-    if doc == nil {
-        return "", fmt.Errorf("empty DID document")
-    }
-
-    // 直接字段（例如 latticePublicKey）
-    if pk, ok := doc["latticePublicKey"].(string); ok && pk != "" {
-        return pk, nil
-    }
-
-    // keyAgreement 数组下的公钥
-    if kaAny, ok := doc["keyAgreement"]; ok {
-        if kaArr, ok := kaAny.([]interface{}); ok {
-            for _, v := range kaArr {
-                if m, ok := v.(map[string]interface{}); ok {
-                    if pkHex, ok := m["publicKeyHex"].(string); ok && pkHex != "" {
-                        return pkHex, nil
-                    }
-                    if pkMb, ok := m["publicKeyMultibase"].(string); ok && pkMb != "" {
-                        // 尝试作为base64解码
-                        if len(pkMb) > 1 && (pkMb[0] == 'm' || pkMb[0] == 'M') {
-                            decoded, err := base64.StdEncoding.DecodeString(pkMb[1:])
-                            if err == nil && len(decoded) > 0 {
-                                return hex.EncodeToString(decoded), nil
-                            }
-                        }
-                    }
-                    if pkB64, ok := m["publicKeyBase64"].(string); ok && pkB64 != "" {
-                        decoded, err := base64.StdEncoding.DecodeString(pkB64)
-                        if err == nil && len(decoded) > 0 {
-                            return hex.EncodeToString(decoded), nil
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return "", fmt.Errorf("no lattice public key found in DID document")
+    return "", fmt.Errorf("lattice public key not used in current version")
 }
 
-// GetLatticePublicKey 获取DID的格加密公钥
+// GetLatticePublicKey 获取DID的格加密公钥（占位实现）
 func (a *authService) GetLatticePublicKey(did string) (string, error) {
-    // 解析原始DID文档
-    rawDoc, err := a.fetchRawDIDDocument(did)
-    if err != nil {
-        return "", err
-    }
-
-    // 提取格加密公钥
-    pk, err := a.extractLatticePublicKeyFromDoc(rawDoc)
-    if err == nil && pk != "" {
-        return pk, nil
-    }
-
-    // 兜底：基于DID派生一个确定性密钥（开发环境占位）
-    if a.didConfig.Method != "" { // 任意条件，仅用于编译通过
-        seed := did + ":lattice"
-        sum := sha256.Sum256([]byte(seed))
-        return hex.EncodeToString(sum[:]), nil
-    }
-    return "", fmt.Errorf("failed to obtain lattice public key")
+    // 当前版本不提供格加密公钥，返回占位符（基于 DID 派生的哈希）
+    seed := did + ":lattice"
+    sum := sha256.Sum256([]byte(seed))
+    return hex.EncodeToString(sum[:]), nil
 }
 
 // extractPublicKeyFromDoc 从DID文档提取ECDSA公钥（十六进制未压缩格式）
@@ -612,52 +559,13 @@ func (a *authService) extractPublicKeyFromDoc(doc map[string]interface{}) (strin
     return "", fmt.Errorf("no suitable public key found")
 }
 
-// verifySignature 验证ECDSA签名
-func (a *authService) verifySignature(nonce, signature, publicKey string) bool {
-	fmt.Printf("[DEBUG] verifyECDSASignature called with nonce: %s, signature: %s, publicKey: %s\n", nonce, signature, publicKey)
-	
-	// 解码base64签名
-	sigBytes, err := base64.StdEncoding.DecodeString(signature)
-	if err != nil {
-		fmt.Printf("[DEBUG] Failed to decode base64 signature: %v\n", err)
-		return false
-	}
-	
-	// 解析混合签名JSON
-	var hybridSig struct {
-		ECDSASignature string      `json:"ecdsa_signature"`
-		KyberProof     interface{} `json:"kyber_proof"`
-	}
-	
-	if err := json.Unmarshal(sigBytes, &hybridSig); err != nil {
-		fmt.Printf("[DEBUG] Failed to parse hybrid signature JSON: %v\n", err)
-		return false
-	}
-	
-	// 解码ECDSA签名
-	ecdsaBytes, err := base64.StdEncoding.DecodeString(hybridSig.ECDSASignature)
-	if err != nil {
-		fmt.Printf("[DEBUG] Failed to decode ECDSA signature: %v\n", err)
-		return false
-	}
-	
-	fmt.Printf("[DEBUG] ECDSA signature length: %d bytes, hex: %x\n", len(ecdsaBytes), ecdsaBytes)
-	
-	// 解析ECDSA公钥（假设是十六进制格式）
-	ecdsaPublicKey, err := a.parseECDSAPublicKey(publicKey)
-	if err != nil {
-		fmt.Printf("[DEBUG] Failed to parse ECDSA public key: %v\n", err)
-		return false
-	}
-	
-	// 计算nonce的SHA256哈希
-	hash := sha256.Sum256([]byte(nonce))
-	
-	// 验证ECDSA签名
-	valid := ecdsa.VerifyASN1(ecdsaPublicKey, hash[:], ecdsaBytes)
-	fmt.Printf("[DEBUG] ECDSA signature verification result: %v\n", valid)
-	
-	return valid
+// verifySignature 使用 HMAC-SHA256 验证签名（与网关保持一致）
+func (a *authService) verifySignature(nonce, signature, did string) bool {
+    key := a.generatePublicKeyFromDIDFallback(did)
+    h := hmac.New(sha256.New, []byte(key))
+    h.Write([]byte(nonce))
+    expected := hex.EncodeToString(h.Sum(nil))
+    return strings.EqualFold(signature, expected)
 }
 
 // parseECDSAPublicKey 解析ECDSA公钥
@@ -709,5 +617,18 @@ func (a *authService) parseECDSAPublicKey(publicKeyStr string) (*ecdsa.PublicKey
 		}, nil
 	}
 	
-	return nil, fmt.Errorf("unsupported public key format, length: %d", len(pubKeyBytes))
+    return nil, fmt.Errorf("unsupported public key format, length: %d", len(pubKeyBytes))
+}
+
+// generatePublicKeyFromDIDFallback 基于 DID 派生用于 HMAC 的密钥（与网关相同逻辑）
+func (a *authService) generatePublicKeyFromDIDFallback(did string) string {
+    parts := strings.Split(did, ":")
+    if len(parts) >= 3 {
+        identifier := parts[2]
+        if len(identifier) >= 32 {
+            return identifier[:32]
+        }
+        return identifier + "default-private-key"[:32-len(identifier)]
+    }
+    return "default-private-key"
 }

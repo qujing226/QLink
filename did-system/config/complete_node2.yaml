@@ -88,4 +88,4 @@ logging:
   max_backups: 3
   max_age: 7
   compress: true
-  file: "/home/peninsula/go/src/QLink/logs/node2.log"
+  file: "/home/peninsula/go/src/QLink/did-system/data/node2.log"

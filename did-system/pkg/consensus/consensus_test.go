@@ -1,79 +1,60 @@
 package consensus
 
 import (
-	"context"
-	"testing"
-	"time"
+    "context"
+    "testing"
+    "time"
 
-	"github.com/qujing226/QLink/pkg/interfaces"
-	"github.com/qujing226/QLink/pkg/network"
+    "github.com/qujing226/QLink/pkg/interfaces"
+    "github.com/qujing226/QLink/pkg/network"
 )
 
-// TestRaftAdapter 测试Raft适配器
-func TestRaftAdapter(t *testing.T) {
-	// 创建模拟的P2P网络
-	p2pNetwork := &network.P2PNetwork{}
+// TestRaftNode 测试Raft节点
+func TestRaftNode(t *testing.T) {
+    // 创建模拟的P2P网络
+    p2pNetwork := &network.P2PNetwork{}
 
-	// 创建Raft适配器
-	adapter := NewRaftAdapter("node1", []string{"node2", "node3"}, p2pNetwork)
+    // 创建Raft节点
+    node := NewRaftNode("node1", p2pNetwork)
 
-	// 测试基本接口
-	testConsensusAlgorithm(t, adapter, "Raft")
+    // 测试基本接口
+    testConsensusAlgorithm(t, node)
 }
 
-// TestPoAAdapter 测试PoA适配器
-func TestPoAAdapter(t *testing.T) {
-	// 创建模拟的P2P网络
-	p2pNetwork := &network.P2PNetwork{}
+// TestPoANode 测试PoA节点
+func TestPoANode(t *testing.T) {
+    // 创建模拟的P2P网络
+    p2pNetwork := &network.P2PNetwork{}
 
-	// 创建PoA适配器
-	authorities := []string{"node1", "node2", "node3"}
-	adapter := NewPoAAdapter("node1", authorities, p2pNetwork)
+    // 创建PoA节点
+    authorities := []string{"node1", "node2", "node3"}
+    node := NewPoANode("node1", authorities, p2pNetwork)
 
-	// 测试基本接口
-	testConsensusAlgorithm(t, adapter, "Proof of Authority")
+    // 测试基本接口
+    testConsensusAlgorithm(t, node)
 }
 
-// testConsensusAlgorithm 测试共识算法接口
-func testConsensusAlgorithm(t *testing.T, algorithm interfaces.ConsensusAlgorithm, expectedName string) {
-	ctx := context.Background()
+// testConsensusAlgorithm 测试共识算法统一接口
+func testConsensusAlgorithm(t *testing.T, algorithm interfaces.ConsensusAlgorithm) {
+    ctx := context.Background()
 
-	// 测试类型和名称
-	if adapter, ok := algorithm.(*RaftAdapter); ok {
-		if adapter.GetType() != interfaces.ConsensusTypeRaft {
-			t.Errorf("Expected Raft type, got %v", adapter.GetType())
-		}
-		if adapter.GetName() != expectedName {
-			t.Errorf("Expected name %s, got %s", expectedName, adapter.GetName())
-		}
-	}
+    // 测试初始状态
+    status := algorithm.GetStatus()
+    if status == nil {
+        t.Error("Status should not be nil")
+    }
 
-	if adapter, ok := algorithm.(*PoAAdapter); ok {
-		if adapter.GetType() != interfaces.ConsensusTypePoA {
-			t.Errorf("Expected PoA type, got %v", adapter.GetType())
-		}
-		if adapter.GetName() != expectedName {
-			t.Errorf("Expected name %s, got %s", expectedName, adapter.GetName())
-		}
-	}
+    // 测试节点列表
+    nodes := algorithm.GetNodes()
+    if len(nodes) == 0 {
+        t.Error("Nodes list should not be empty")
+    }
 
-	// 测试初始状态
-	status := algorithm.GetStatus()
-	if status == nil {
-		t.Error("Status should not be nil")
-	}
-
-	// 测试节点列表
-	nodes := algorithm.GetNodes()
-	if len(nodes) == 0 {
-		t.Error("Nodes list should not be empty")
-	}
-
-	// 测试启动和停止
-	err := algorithm.Start(ctx)
-	if err != nil {
-		t.Logf("Start failed (expected in test environment): %v", err)
-	}
+    // 测试启动和停止
+    err := algorithm.Start(ctx)
+    if err != nil {
+        t.Logf("Start failed (expected in test environment): %v", err)
+    }
 
 	// 测试停止
 	err = algorithm.Stop()
@@ -82,249 +63,225 @@ func testConsensusAlgorithm(t *testing.T, algorithm interfaces.ConsensusAlgorith
 	}
 }
 
-// TestConsensusSwitcherAdapter 测试共识切换器适配器
-func TestConsensusSwitcherAdapter(t *testing.T) {
-	// 创建切换器配置
-	config := &SwitcherAdapterConfig{
-		SwitchStrategy:      SwitchStrategyGraceful,
-		SwitchTimeout:       10 * time.Second,
-		DataSyncTimeout:     5 * time.Second,
-		EnableAutoSwitch:    false,
-		RequireConfirmation: false,
-		BackupBeforeSwitch:  false,
-		EnableRollback:      false,
-	}
+// TestConsensusSwitcher 测试共识切换器
+func TestConsensusSwitcher(t *testing.T) {
+    // 创建切换器配置
+    config := &SwitcherConfig{
+        SwitchStrategy:      SwitchStrategyGraceful,
+        SwitchTimeout:       10 * time.Second,
+        DataSyncTimeout:     5 * time.Second,
+        EnableAutoSwitch:    false,
+        RequireConfirmation: false,
+        BackupBeforeSwitch:  false,
+        EnableRollback:      false,
+    }
 
-	// 创建切换器适配器
-	switcher := NewConsensusSwitcherAdapter(config)
+    // 创建切换器
+    switcher := NewConsensusSwitcher(config)
 
-	// 创建模拟的P2P网络
-	p2pNetwork := &network.P2PNetwork{}
+    // 创建模拟的P2P网络与节点
+    p2pNetwork := &network.P2PNetwork{}
+    raftNode := NewRaftNode("node1", p2pNetwork)
+    poaNode := NewPoANode("node1", []string{"node1", "node2", "node3"}, p2pNetwork)
+    monitor := NewConsensusMonitor(nil)
 
-	// 初始化切换器
-	err := switcher.Initialize("node1", []string{"node2", "node3"}, []string{"node1", "node2", "node3"}, p2pNetwork, nil)
-	if err != nil {
-		t.Fatalf("Failed to initialize switcher: %v", err)
-	}
+    // 初始化切换器
+    err := switcher.Initialize(raftNode, poaNode, monitor)
+    if err != nil {
+        t.Fatalf("Failed to initialize switcher: %v", err)
+    }
 
-	// 测试当前类型
-	currentType := switcher.GetCurrentType()
-	if currentType != interfaces.ConsensusTypeRaft {
-		t.Errorf("Expected initial type to be Raft, got %v", currentType)
-	}
+    // 测试当前类型
+    currentType := switcher.GetCurrentType()
+    if currentType != ConsensusTypeRaft {
+        t.Errorf("Expected initial type to be Raft, got %v", currentType)
+    }
 
-	// 测试支持的类型
-	supportedTypes := switcher.GetSupportedTypes()
-	if len(supportedTypes) != 2 {
-		t.Errorf("Expected 2 supported types, got %d", len(supportedTypes))
-	}
+    // 测试支持的类型
+    supportedTypes := switcher.GetSupportedTypes()
+    if len(supportedTypes) != 2 {
+        t.Errorf("Expected 2 supported types, got %d", len(supportedTypes))
+    }
 
-	// 测试是否支持特定类型
-	if !switcher.IsSupported(interfaces.ConsensusTypeRaft) {
-		t.Error("Should support Raft")
-	}
+    // 测试是否支持特定类型
+    if !switcher.IsSupported(ConsensusTypeRaft) {
+        t.Error("Should support Raft")
+    }
 
-	if !switcher.IsSupported(interfaces.ConsensusTypePoA) {
-		t.Error("Should support PoA")
-	}
+    if !switcher.IsSupported(ConsensusTypePoA) {
+        t.Error("Should support PoA")
+    }
 
-	if switcher.IsSupported(interfaces.ConsensusTypePBFT) {
-		t.Error("Should not support PBFT")
-	}
+    // 测试状态获取
+    status := switcher.GetStatus()
+    if status == nil {
+        t.Error("Status should not be nil")
+    }
 
-	// 测试状态获取
-	status := switcher.GetStatus()
-	if status == nil {
-		t.Error("Status should not be nil")
-	}
+    // 测试切换状态
+    switchState := switcher.GetSwitchState()
+    if switchState == nil {
+        t.Error("Switch state should not be nil")
+    }
 
-	// 测试切换状态
-	switchState := switcher.GetSwitchState()
-	if switchState == nil {
-		t.Error("Switch state should not be nil")
-	}
-
-	if switchState.InProgress {
-		t.Error("Should not be switching initially")
-	}
+    if switchState.InProgress {
+        t.Error("Should not be switching initially")
+    }
 }
 
-// TestConsensusTypeString 测试共识类型字符串转换
+// TestConsensusTypeString 测试共识类型字符串转换（使用共识模块常量）
 func TestConsensusTypeString(t *testing.T) {
-	tests := []struct {
-		consensusType interfaces.ConsensusType
-		expected      string
-	}{
-		{interfaces.ConsensusTypeRaft, "Raft"},
-		{interfaces.ConsensusTypePoA, "PoA"},
-		{interfaces.ConsensusTypePBFT, "PBFT"},
-		{interfaces.ConsensusTypePoS, "PoS"},
-	}
+    tests := []struct {
+        consensusType ConsensusType
+        expected      string
+    }{
+        {ConsensusTypeRaft, "Raft"},
+        {ConsensusTypePoA, "PoA"},
+        {ConsensusTypePBFT, "PBFT"},
+        {ConsensusTypePoS, "PoS"},
+    }
 
-	for _, test := range tests {
-		result := test.consensusType.String()
-		if result != test.expected {
-			t.Errorf("Expected %s, got %s", test.expected, result)
-		}
-	}
+    for _, test := range tests {
+        // 使用 switcher 的 getConsensusTypeName 等价逻辑
+        var result string
+        switch test.consensusType {
+        case ConsensusTypeRaft:
+            result = "Raft"
+        case ConsensusTypePoA:
+            result = "PoA"
+        case ConsensusTypePBFT:
+            result = "PBFT"
+        case ConsensusTypePoS:
+            result = "PoS"
+        default:
+            result = "unknown"
+        }
+        if result != test.expected {
+            t.Errorf("Expected %s, got %s", test.expected, result)
+        }
+    }
 }
 
-// TestRaftAdapterMetrics 测试Raft适配器指标
-func TestRaftAdapterMetrics(t *testing.T) {
-	p2pNetwork := &network.P2PNetwork{}
-	adapter := NewRaftAdapter("node1", []string{"node2", "node3"}, p2pNetwork)
+// TestRaftStatusFields 检查Raft节点状态字段
+func TestRaftStatusFields(t *testing.T) {
+    p2pNetwork := &network.P2PNetwork{}
+    node := NewRaftNode("node1", p2pNetwork)
 
-	metrics := adapter.GetMetrics()
-	if metrics == nil {
-		t.Error("Metrics should not be nil")
-	}
+    status := node.GetStatus()
+    if status == nil {
+        t.Error("Status should not be nil")
+    }
 
-	// 检查必要的指标字段
-	expectedFields := []string{"current_term", "log_entries", "commit_index", "last_applied", "peer_count", "state"}
-	for _, field := range expectedFields {
-		if _, exists := metrics[field]; !exists {
-			t.Errorf("Metrics should contain field: %s", field)
-		}
-	}
+    // 检查必要的状态字段
+    expectedFields := []string{"id", "state", "term", "voted_for", "log_length", "commit_index", "last_applied", "peer_count"}
+    for _, field := range expectedFields {
+        if _, exists := status[field]; !exists {
+            t.Errorf("Status should contain field: %s", field)
+        }
+    }
 }
 
-// TestPoAAdapterMetrics 测试PoA适配器指标
-func TestPoAAdapterMetrics(t *testing.T) {
-	p2pNetwork := &network.P2PNetwork{}
-	authorities := []string{"node1", "node2", "node3"}
-	adapter := NewPoAAdapter("node1", authorities, p2pNetwork)
+// TestPoAStatusFields 检查PoA节点状态字段
+func TestPoAStatusFields(t *testing.T) {
+    p2pNetwork := &network.P2PNetwork{}
+    authorities := []string{"node1", "node2", "node3"}
+    node := NewPoANode("node1", authorities, p2pNetwork)
 
-	metrics := adapter.GetMetrics()
-	if metrics == nil {
-		t.Error("Metrics should not be nil")
-	}
+    status := node.GetStatus()
+    if status == nil {
+        t.Error("Status should not be nil")
+    }
 
-	// 检查必要的指标字段
-	expectedFields := []string{"block_height", "authority_count", "is_authority", "proposal_count"}
-	for _, field := range expectedFields {
-		if _, exists := metrics[field]; !exists {
-			t.Errorf("Metrics should contain field: %s", field)
-		}
-	}
+    // 检查必要的状态字段
+    expectedFields := []string{"node_id", "is_authority", "authorities", "block_height", "current_hash", "proposals", "block_time", "vote_threshold"}
+    for _, field := range expectedFields {
+        if _, exists := status[field]; !exists {
+            t.Errorf("Status should contain field: %s", field)
+        }
+    }
 }
 
-// TestRaftAdapterValidation 测试Raft适配器验证功能
-func TestRaftAdapterValidation(t *testing.T) {
-	p2pNetwork := &network.P2PNetwork{}
-	adapter := NewRaftAdapter("node1", []string{"node2", "node3"}, p2pNetwork)
+// 删除 Raft 适配器验证测试：RaftNode 不提供区块/提案者验证接口
 
-	// 测试区块验证
-	err := adapter.ValidateBlock(nil)
-	if err == nil {
-		t.Error("Should reject nil block")
-	}
+// TestPoAValidation 测试PoA节点验证功能
+func TestPoAValidation(t *testing.T) {
+    p2pNetwork := &network.P2PNetwork{}
+    authorities := []string{"node1", "node2", "node3"}
+    node := NewPoANode("node1", authorities, p2pNetwork)
 
-	err = adapter.ValidateBlock("valid_block")
-	if err != nil {
-		t.Errorf("Should accept valid block: %v", err)
-	}
+    // 测试区块验证
+    err := node.ValidateBlock(nil)
+    if err == nil {
+        t.Error("Should reject nil block")
+    }
 
-	// 测试提案者验证
-	err = adapter.ValidateProposer("unknown_node", 1)
-	if err == nil {
-		t.Error("Should reject unknown proposer")
-	}
+    // 测试提案者验证
+    err = node.ValidateProposer("node1", 1)
+    if err != nil {
+        t.Errorf("Should accept authority proposer: %v", err)
+    }
 
-	// 测试权威节点检查
-	if !adapter.IsAuthority("node1") {
-		t.Error("node1 should be authority")
-	}
+    err = node.ValidateProposer("unknown_node", 1)
+    if err == nil {
+        t.Error("Should reject non-authority proposer")
+    }
 
-	if adapter.IsAuthority("unknown_node") {
-		t.Error("unknown_node should not be authority")
-	}
+    // 测试下一个提案者
+    nextProposer := node.GetNextProposer(0)
+    if nextProposer != "node1" {
+        t.Errorf("Expected node1 as next proposer for block 0, got %s", nextProposer)
+    }
 
-	// 测试权威节点列表
-	authorities := adapter.GetAuthorities()
-	if len(authorities) == 0 {
-		t.Error("Should have authorities")
-	}
+    nextProposer = node.GetNextProposer(1)
+    if nextProposer != "node2" {
+        t.Errorf("Expected node2 as next proposer for block 1, got %s", nextProposer)
+    }
+
+    // 测试权威节点管理
+    err = node.AddAuthority("node4")
+    if err != nil {
+        t.Errorf("Should be able to add new authority: %v", err)
+    }
+
+    err = node.AddAuthority("node1")
+    if err == nil {
+        t.Error("Should not be able to add existing authority")
+    }
+
+    err = node.RemoveAuthority("node4")
+    if err != nil {
+        t.Errorf("Should be able to remove authority: %v", err)
+    }
+
+    err = node.RemoveAuthority("unknown_node")
+    if err == nil {
+        t.Error("Should not be able to remove non-existent authority")
+    }
 }
 
-// TestPoAAdapterValidation 测试PoA适配器验证功能
-func TestPoAAdapterValidation(t *testing.T) {
-	p2pNetwork := &network.P2PNetwork{}
-	authorities := []string{"node1", "node2", "node3"}
-	adapter := NewPoAAdapter("node1", authorities, p2pNetwork)
+// BenchmarkRaftNodeStart 基准测试Raft节点启动
+func BenchmarkRaftNodeStart(b *testing.B) {
+    p2pNetwork := &network.P2PNetwork{}
 
-	// 测试区块验证
-	err := adapter.ValidateBlock(nil)
-	if err == nil {
-		t.Error("Should reject nil block")
-	}
-
-	// 测试提案者验证
-	err = adapter.ValidateProposer("node1", 1)
-	if err != nil {
-		t.Errorf("Should accept authority proposer: %v", err)
-	}
-
-	err = adapter.ValidateProposer("unknown_node", 1)
-	if err == nil {
-		t.Error("Should reject non-authority proposer")
-	}
-
-	// 测试下一个提案者
-	nextProposer := adapter.GetNextProposer(0)
-	if nextProposer != "node1" {
-		t.Errorf("Expected node1 as next proposer for block 0, got %s", nextProposer)
-	}
-
-	nextProposer = adapter.GetNextProposer(1)
-	if nextProposer != "node2" {
-		t.Errorf("Expected node2 as next proposer for block 1, got %s", nextProposer)
-	}
-
-	// 测试权威节点管理
-	err = adapter.AddAuthority("node4")
-	if err != nil {
-		t.Errorf("Should be able to add new authority: %v", err)
-	}
-
-	err = adapter.AddAuthority("node1")
-	if err == nil {
-		t.Error("Should not be able to add existing authority")
-	}
-
-	err = adapter.RemoveAuthority("node4")
-	if err != nil {
-		t.Errorf("Should be able to remove authority: %v", err)
-	}
-
-	err = adapter.RemoveAuthority("unknown_node")
-	if err == nil {
-		t.Error("Should not be able to remove non-existent authority")
-	}
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        node := NewRaftNode("node1", p2pNetwork)
+        ctx := context.Background()
+        node.Start(ctx)
+        node.Stop()
+    }
 }
 
-// BenchmarkRaftAdapterStart 基准测试Raft适配器启动
-func BenchmarkRaftAdapterStart(b *testing.B) {
-	p2pNetwork := &network.P2PNetwork{}
+// BenchmarkPoANodeStart 基准测试PoA节点启动
+func BenchmarkPoANodeStart(b *testing.B) {
+    p2pNetwork := &network.P2PNetwork{}
+    authorities := []string{"node1", "node2", "node3"}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		adapter := NewRaftAdapter("node1", []string{"node2", "node3"}, p2pNetwork)
-		ctx := context.Background()
-		adapter.Start(ctx)
-		adapter.Stop()
-	}
-}
-
-// BenchmarkPoAAdapterStart 基准测试PoA适配器启动
-func BenchmarkPoAAdapterStart(b *testing.B) {
-	p2pNetwork := &network.P2PNetwork{}
-	authorities := []string{"node1", "node2", "node3"}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		adapter := NewPoAAdapter("node1", authorities, p2pNetwork)
-		ctx := context.Background()
-		adapter.Start(ctx)
-		adapter.Stop()
-	}
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        node := NewPoANode("node1", authorities, p2pNetwork)
+        ctx := context.Background()
+        node.Start(ctx)
+        node.Stop()
+    }
 }

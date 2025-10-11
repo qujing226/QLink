@@ -25,8 +25,8 @@ body {
 }
 
 #app {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  overflow: auto; /* 允许滚动条显示 */
 }
 
 button {
