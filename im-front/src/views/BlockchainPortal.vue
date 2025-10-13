@@ -19,10 +19,9 @@
     <!-- 主要内容区域 -->
     <main class="portal-main">
       <div class="container">
-        <!-- 页面级简要介绍（置于标题栏下、首页横幅之上） -->
-        <div class="page-lead">QLink：以自我主权身份为核心的可信网络。</div>
+        <!-- 页面级简要介绍已移除，避免顶部出现无意义空白 -->
         <!-- 首页 -->
-        <section id="home" class="tab-content home-section full-screen full-bleed">
+        <section id="home" class="tab-content home-section full-screen full-bleed" :style="{ opacity: sectionOpacity.home }">
           <div class="hero-banner" :style="{ opacity: heroOpacity, transform: 'translateY(' + heroTranslateY + 'px)' }">
             <div class="hero-overlay">
               <div class="hero-grid">
@@ -49,9 +48,10 @@
           </div>
         </section>
         <!-- DID注册 -->
-        <section id="register" class="tab-content full-screen gradient-section">
-          <div class="two-col">
-            <div class="col-left form-card">
+        <section id="register" class="tab-content full-screen gradient-section full-bleed" :style="{ filter: 'brightness(' + registerBrightness + ')', opacity: sectionOpacity.register }">
+          <div class="section-content">
+            <div class="two-col">
+              <div class="col-left form-card">
               <div class="section-header">
                 <h2>DID身份注册</h2>
                 <p>创建您的去中心化身份标识符</p>
@@ -71,8 +71,10 @@
                     v-model="registerForm.identifier" 
                     type="text" 
                     class="form-input"
-                    placeholder="留空将自动生成"
+                    placeholder="例如 did:qlink:alice123；留空自动生成"
+                    @keydown.enter="registerDID"
                   />
+                  <p class="input-help">建议使用字母数字；不填将按公钥自动生成。</p>
                 </div>
                 <div class="form-group">
                   <label>描述</label>
@@ -81,7 +83,9 @@
                     class="form-textarea"
                     placeholder="为您的DID添加描述信息"
                     rows="3"
+                    @keydown.enter="registerDID"
                   ></textarea>
+                  <p class="input-help">可选：用于说明此DID的用途。</p>
                 </div>
                 <div class="form-actions">
                   <button 
@@ -95,8 +99,8 @@
                 </div>
               </div>
             </div>
-            <div class="col-right">
-              <div v-if="registerResult" class="form-card register-result">
+            <div class="col-right" v-if="registerResult">
+              <div class="form-card register-result">
                 <h3>✅ 注册成功！</h3>
                 <div class="result-item">
                   <label>DID标识符:</label>
@@ -164,7 +168,7 @@
                   💡 ECDSA私钥用于身份验证，Kyber768私钥用于通信加密
                 </div>
               </div>
-              <div v-else class="result-placeholder"></div>
+            </div>
             </div>
           </div>
         </section>
@@ -172,9 +176,10 @@
         
 
         <!-- DID查询 -->
-        <section id="query" class="tab-content full-screen">
-          <div class="two-col">
-            <div class="col-left form-card">
+        <section id="query" class="tab-content full-screen full-bleed" :style="{ filter: 'brightness(' + queryBrightness + ')', opacity: sectionOpacity.query }">
+          <div class="section-content">
+            <div class="two-col">
+              <div class="col-left form-card">
               <div class="section-header">
                 <h2>DID身份查询</h2>
                 <p>查询已注册的DID身份信息</p>
@@ -186,9 +191,10 @@
                     v-model="queryForm.did" 
                     type="text" 
                     class="form-input"
-                    placeholder="输入要查询的DID"
+                    placeholder="例如 did:qlink:alice123"
                     @keydown.enter="queryDID"
                   />
+                  <p class="input-help">支持 did:qlink、did:key 等格式；回车可快速查询。</p>
                 </div>
                 <div class="form-actions">
                   <button 
@@ -201,8 +207,8 @@
                 </div>
               </div>
             </div>
-            <div class="col-right">
-              <div v-if="queryResult" class="form-card query-result">
+            <div class="col-right" v-if="queryResult">
+              <div class="form-card query-result">
                 <h3>📋 DID信息</h3>
                 <div class="result-card">
                   <div class="result-item">
@@ -227,15 +233,16 @@
                   </div>
                 </div>
               </div>
-              <div v-else class="result-placeholder"></div>
+            </div>
             </div>
           </div>
         </section>
 
         <!-- DID管理 -->
-        <section id="manage" class="tab-content full-screen">
-          <div class="two-col">
-            <div class="col-left form-card">
+        <section id="manage" class="tab-content full-screen full-bleed" :style="{ filter: 'brightness(' + manageBrightness + ')', opacity: sectionOpacity.manage }">
+          <div class="section-content">
+            <div class="two-col">
+              <div class="col-left form-card">
               <div class="section-header">
                 <h2>DID身份管理</h2>
                 <p>管理您的DID身份信息</p>
@@ -247,8 +254,10 @@
                     v-model="manageForm.did" 
                     type="text" 
                     class="form-input"
-                    placeholder="输入您的DID"
+                    placeholder="例如 did:qlink:alice123"
+                    @keydown.enter="verifyOwnership"
                   />
+                  <p class="input-help">请先确认该DID已注册并处于活跃状态。</p>
                 </div>
                 <div class="form-group">
                   <label>私钥验证</label>
@@ -256,8 +265,10 @@
                     v-model="manageForm.privateKey" 
                     type="password" 
                     class="form-input"
-                    placeholder="输入私钥以验证身份"
+                    placeholder="输入ECDSA私钥（Base64）以验证身份"
+                    @keydown.enter="verifyOwnership"
                   />
+                  <p class="input-help">仅在本地用于签名验证，不会上传到服务器。</p>
                 </div>
                 <div class="form-actions">
                   <button 
@@ -270,8 +281,8 @@
                 </div>
               </div>
             </div>
-            <div class="col-right">
-              <div v-if="ownershipVerified" class="form-card management-actions">
+            <div class="col-right" v-if="ownershipVerified">
+              <div class="form-card management-actions">
                 <h3>🛠️ 可用操作</h3>
                 <div class="action-grid">
                   <button class="action-btn update" @click="showUpdateForm = true">
@@ -311,7 +322,9 @@
                       v-model="updateForm.description" 
                       class="form-textarea"
                       rows="3"
+                      @keydown.enter="updateDID"
                     ></textarea>
+                    <p class="input-help">可选：建议不超过 140 字。</p>
                   </div>
                   <div class="form-actions">
                     <button class="btn btn-secondary" @click="showUpdateForm = false">取消</button>
@@ -319,7 +332,7 @@
                   </div>
                 </div>
               </div>
-              <div v-else class="result-placeholder"></div>
+            </div>
             </div>
           </div>
         </section>
@@ -363,13 +376,30 @@ const sections = ['home', 'register', 'query', 'manage']
 const activeSection = ref('home')
 let wheelLock = false
 let sectionObserver = null
+let headerHeight = 80
+// 动态同步头部高度到 CSS 变量，防止不同设备下吸附偏移
+const updateHeaderHeight = () => {
+  try {
+    const header = document.querySelector('.portal-header')
+    const h = header ? header.offsetHeight : 80
+    document.documentElement.style.setProperty('--header-h', `${h}px`)
+    headerHeight = h
+  } catch (_) { /* 忽略 */ }
+}
+
+// 各分区滚动渐明渐暗效果
+const registerBrightness = ref(1)
+const queryBrightness = ref(1)
+const manageBrightness = ref(1)
+// 各分区渐隐透明效果（根据可见比例）
+const sectionOpacity = ref({ home: 1, register: 1, query: 1, manage: 1 })
 
 const wheelHandler = (e) => {
   // 更平滑的分屏滚动：仅在切换分屏时阻止默认滚动
   if (wheelLock) return
   const idx = sections.indexOf(activeSection.value)
   let target = null
-  const threshold = 25
+  const threshold = 15
   if (e.deltaY > threshold) {
     // 下滚：切换到下一屏
     if (idx < sections.length - 1) target = sections[idx + 1]
@@ -383,7 +413,7 @@ const wheelHandler = (e) => {
     e.preventDefault()
     wheelLock = true
     goSection(target)
-    setTimeout(() => { wheelLock = false }, 500)
+    setTimeout(() => { wheelLock = false }, 320)
   }
 }
 
@@ -391,7 +421,7 @@ const goSection = (id) => {
   activeSection.value = id
   const el = document.getElementById(id)
   if (!el) return
-  // 使用平滑滚动，提升体验
+  // 使用 scrollIntoView，结合视口的 scroll-padding-top，使顶部贴到 header 底端
   el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
@@ -791,6 +821,10 @@ const watchToasts = () => {
 }
 
 onMounted(() => {
+  // 初始同步头部高度，并在窗口尺寸变化时更新
+  updateHeaderHeight()
+  window.addEventListener('resize', updateHeaderHeight, { passive: true })
+
   // 页面加载完成
   heroScrollHandler = () => {
     const y = window.scrollY || 0
@@ -798,38 +832,96 @@ onMounted(() => {
     const ratio = Math.min(y / max, 1)
     heroOpacity.value = 1 - ratio * 0.6
     heroTranslateY.value = ratio * 40
+
+    // 根据每个分区在视口中的可见比例，计算亮度实现渐明渐暗
+    const vh = window.innerHeight || 800
+    const computeBrightness = (id) => {
+      const el = document.getElementById(id)
+      if (!el) return 1
+      const rect = el.getBoundingClientRect()
+      const visible = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0))
+      const ratio = Math.max(0, Math.min(visible / vh, 1))
+      const base = 0.75
+      const delta = 0.25
+      return (base + delta * ratio).toFixed(3)
+    }
+    // 根据可见比例计算透明度（越少可见越透明）
+    const computeOpacity = (id) => {
+      const el = document.getElementById(id)
+      if (!el) return 1
+      const rect = el.getBoundingClientRect()
+      const visible = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0))
+      const ratio = Math.max(0, Math.min(visible / vh, 1))
+      const base = 0.2 // 最低不透明度
+      const delta = 0.8 // 可见比例越大越接近1
+      return (base + delta * ratio).toFixed(3)
+    }
+    registerBrightness.value = computeBrightness('register')
+    queryBrightness.value = computeBrightness('query')
+    manageBrightness.value = computeBrightness('manage')
+    sectionOpacity.value.home = computeOpacity('home')
+    sectionOpacity.value.register = computeOpacity('register')
+    sectionOpacity.value.query = computeOpacity('query')
+    sectionOpacity.value.manage = computeOpacity('manage')
   }
   window.addEventListener('scroll', heroScrollHandler, { passive: true })
   heroScrollHandler()
 
-  // 观察分屏分区，动态同步头部按钮状态
+  // 观察分屏分区，动态同步头部按钮状态与亮度
   sectionObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
         activeSection.value = entry.target.id
       }
+
+      // 根据可见比例设置亮度，实现滚动时渐明渐暗
+      const ratio = entry.intersectionRatio
+      const base = 0.85
+      const delta = 0.15
+      const brightness = (base + delta * ratio).toFixed(3)
+      const fadeBase = 0.2
+      const fadeDelta = 0.8
+      const opacity = (fadeBase + fadeDelta * ratio).toFixed(3)
+      switch (entry.target.id) {
+        case 'register':
+          registerBrightness.value = brightness
+          sectionOpacity.value.register = opacity
+          break
+        case 'query':
+          queryBrightness.value = brightness
+          sectionOpacity.value.query = opacity
+          break
+        case 'manage':
+          manageBrightness.value = brightness
+          sectionOpacity.value.manage = opacity
+          break
+        case 'home':
+          sectionOpacity.value.home = opacity
+          break
+      }
     })
-  }, { threshold: [0.6] })
+  }, { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] })
 
   sections.forEach(id => {
     const el = document.getElementById(id)
     if (el) sectionObserver.observe(el)
   })
 
-  // 分屏滚轮
+  // 绑定智能滚轮分屏切换（允许阻止默认以实现切屏）
   window.addEventListener('wheel', wheelHandler, { passive: false })
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateHeaderHeight)
   if (heroScrollHandler) {
     window.removeEventListener('scroll', heroScrollHandler)
     heroScrollHandler = null
   }
-  window.removeEventListener('wheel', wheelHandler)
   if (sectionObserver) {
     sectionObserver.disconnect()
     sectionObserver = null
   }
+  window.removeEventListener('wheel', wheelHandler)
 })
 </script>
 
@@ -936,12 +1028,15 @@ onUnmounted(() => {
 
 /* 主要内容 */
 .portal-main {
-  padding: calc(var(--header-h, 80px) + 40px) 20px 40px 20px;
+  /* 让容器顶部正好贴在固定头部的底端（位置对齐）*/
+  margin-top: var(--header-h, 80px);
+  /* 由窗口作为唯一吸附容器，避免嵌套冲突 */
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
+  padding-top: 0;
 }
 
 .page-lead {
@@ -981,9 +1076,15 @@ onUnmounted(() => {
 
 /* 全屏分区样式 */
 .full-screen {
-  min-height: calc(100vh - 120px);
+  /* 精确分屏高度：视窗减头部，避免露出下一屏 */
+  height: calc(100vh - var(--header-h, 80px));
   display: flex;
   align-items: center;
+  scroll-snap-align: start;
+  /* 强制每次吸附停在完整分屏 */
+  scroll-snap-stop: normal;
+  /* 让分屏顶部在滚动与吸附时贴合到 header 底端 */
+  scroll-margin-top: var(--header-h, 80px);
 }
 
 .full-screen.tab-content {
@@ -996,6 +1097,7 @@ onUnmounted(() => {
 /* 紫色渐变英雄横幅 */
 .hero-banner {
   width: 100%;
+  /* 与分屏高度一致，避免底部露白或溢出 */
   height: calc(100vh - var(--header-h, 80px));
   border-radius: 12px;
   background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
@@ -1045,12 +1147,26 @@ onUnmounted(() => {
 .hero-actions-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(140px, 1fr));
-  grid-auto-rows: 48px;
-  gap: 12px;
+  grid-auto-rows: 52px;
+  gap: 16px;
 }
 
 .hero-actions-grid .btn {
   justify-content: center;
+  width: 100%;
+}
+
+/* 页面级简介条 */
+.page-lead {
+  width: 100%;
+  margin: 0 0 20px 0;
+  padding: 10px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
 }
 
 .tab-content {
@@ -1059,6 +1175,26 @@ onUnmounted(() => {
   border-radius: 12px;
   padding: 40px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  transition: opacity 0.3s ease; /* 渐隐过渡 */
+}
+
+/* 分区配色：与首页渐变风格一致但配色不同 */
+#register.full-screen.tab-content {
+  background: linear-gradient(135deg, rgba(186,85,211,0.18) 0%, rgba(255,182,193,0.18) 100%);
+  border: none;
+  box-shadow: none;
+}
+
+#query.full-screen.tab-content {
+  background: linear-gradient(135deg, rgba(255,245,157,0.22) 0%, rgba(255,228,181,0.22) 100%);
+  border: none;
+  box-shadow: none;
+}
+
+#manage.full-screen.tab-content {
+  background: linear-gradient(135deg, rgba(200,200,200,0.22) 0%, rgba(160,160,160,0.22) 100%);
+  border: none;
+  box-shadow: none;
 }
 
 /* 注册分区渐变背景 */
@@ -1134,6 +1270,13 @@ onUnmounted(() => {
   justify-content: center;
 }
 
+/* 输入帮助文字样式 */
+.input-help {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
 /* 查询与管理页的动作按钮左对齐，更贴近表单语义 */
 .query-form .form-actions,
 .manage-form .form-actions {
@@ -1202,8 +1345,9 @@ onUnmounted(() => {
 
 .register-result h3 {
   margin: 0 0 20px 0;
-  color: #e5e7eb;
-  font-size: 20px;
+  color: #333;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .result-item {
@@ -1274,8 +1418,9 @@ onUnmounted(() => {
 
 .query-result h3 {
   margin: 0 0 16px 0;
-  color: #e5e7eb;
-  font-size: 20px;
+  color: #333;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .result-card {
@@ -1283,6 +1428,7 @@ onUnmounted(() => {
   border-radius: 12px;
   padding: 20px;
   border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
 }
 
 .result-card .result-item {
@@ -1299,7 +1445,7 @@ onUnmounted(() => {
 
 .result-card .result-item label {
   font-weight: 600;
-  color: #9ca3af;
+  color: #555;
   margin: 0;
 }
 
@@ -1484,9 +1630,74 @@ onUnmounted(() => {
   .form-actions {
     flex-direction: column;
   }
+
+  /* 移动端首页布局：文案与按钮纵向排列，按钮单列满宽 */
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .hero-actions-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 48px;
+    gap: 12px;
+  }
 }
 </style>
 <style scoped>
+.section-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* 让分区背景更有层次：线性渐变 + 轻微径向晕染 */
+#register.full-screen.tab-content {
+  position: relative;
+  background: linear-gradient(90deg, #fbd3e9 0%, #fef9c3 100%);
+  border: none;
+  border-radius: 0;
+}
+#register.full-screen.tab-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(1200px circle at 20% 20%, rgba(255,255,255,0.12), transparent 60%);
+  pointer-events: none;
+}
+
+#query.full-screen.tab-content {
+  position: relative;
+  background: linear-gradient(90deg, #a7f3d0 0%, #7dd3fc 100%);
+  border: none;
+  border-radius: 0;
+}
+#query.full-screen.tab-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(1200px circle at 80% 20%, rgba(255,255,255,0.12), transparent 60%);
+  pointer-events: none;
+}
+
+#manage.full-screen.tab-content {
+  position: relative;
+  background: linear-gradient(90deg, #e5e7eb 0%, #374151 100%);
+  border: none;
+  border-radius: 0;
+}
+#manage.full-screen.tab-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(1200px circle at 30% 70%, rgba(255,255,255,0.10), transparent 60%);
+  pointer-events: none;
+}
+
+/* 点击导航滚动的顺滑度 */
+html, body { scroll-behavior: smooth; }
+.full-bleed {
+  margin-left: calc((100vw - 1200px) / -2);
+  margin-right: calc((100vw - 1200px) / -2);
+}
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;

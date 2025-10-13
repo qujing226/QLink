@@ -15,6 +15,15 @@
   box-sizing: border-box;
 }
 
+html, body {
+  height: 100%;
+  overflow-y: auto;
+  scroll-behavior: smooth; /* 全局平滑滚动 */
+  overscroll-behavior: contain; /* 防止滚动链到嵌套容器导致抖动 */
+  /* 放松分页吸附以提升滚动顺滑度 */
+  scroll-snap-type: y proximity;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -26,7 +35,8 @@ body {
 
 #app {
   min-height: 100vh;
-  overflow: auto; /* 允许滚动条显示 */
+  /* 移除内部滚动，避免与窗口滚动叠加导致卡顿 */
+  overflow: visible;
 }
 
 button {
