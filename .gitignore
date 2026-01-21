@@ -1,0 +1,60 @@
+# IDE
+.idea/
+.vscode/
+
+# Node.js
+node_modules/
+
+# build output
+dist/
+build/
+bin/
+out/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.DS_Store
+dist
+dist-ssr
+coverage
+*.local
+
+/cypress/videos/
+/cypress/screenshots/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*.tsbuildinfo
+
+# log
+*.log
+
+# 环境变量文件
+.env*
+
+# cache file
+.cache/
+.tmp/
+coverage/
+*.swp
+
+# 操作系统生成文件
+.DS_Store
+Thumbs.db
+
