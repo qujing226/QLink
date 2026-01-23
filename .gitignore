@@ -41,20 +41,12 @@ coverage
 *.sw?
 
 *.tsbuildinfo
-
-# log
-*.log
-
-# 环境变量文件
 .env*
+*.db
 
 # cache file
 .cache/
 .tmp/
+.gocache/
 coverage/
 *.swp
-
-# 操作系统生成文件
-.DS_Store
-Thumbs.db
-
