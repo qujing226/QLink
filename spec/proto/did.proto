@@ -56,6 +56,15 @@ message Status {
   string message = 3; // Detailed error message (empty if SUCCESS)
 }
 
+// SessionState defines the formal lifecycle of a QLink session.
+enum SessionState {
+  STATE_IDLE         = 0; // Initial state
+  STATE_RESOLVING    = 1; // Blocking on chain resolution (Slow Path)
+  STATE_SPECULATIVE  = 2; // Optimistic execution based on cache (Fast Path)
+  STATE_VERIFIED     = 3; // Cryptographically verified against on-chain trust anchor
+  STATE_COMPROMISED  = 4; // Security violation detected (Rollback triggered)
+}
+
 /* =========================================================================
  * Handshake Payloads (Kyber768)
  * ========================================================================= */

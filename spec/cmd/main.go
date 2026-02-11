@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	RelayPort = "9000"
+	RelayPort = "19000"
 	RelayAddr = "localhost:" + RelayPort
 )
 
@@ -28,12 +28,12 @@ func main() {
 	// 2. Setup Shared Infrastructure (Blockchain)
 	// Latency = 500ms to simulate real-world blockchain slowness
 	simChain := blockchain.NewSimulatedChain(500 * time.Millisecond)
-	
+
 	// Alice and Bob share the same view of the blockchain (and cache logic)
 	// In reality, they would have separate local caches.
 	// Let's give them separate caches wrapping the SAME chain.
 	aliceCache := blockchain.NewOptimisticCache(simChain, onMismatch("Alice"))
-	bobCache   := blockchain.NewOptimisticCache(simChain, onMismatch("Bob"))
+	bobCache := blockchain.NewOptimisticCache(simChain, onMismatch("Bob"))
 
 	// 3. Initialize Clients
 	// Bob (Responder)
@@ -67,11 +67,11 @@ func main() {
 	// =========================================================================
 	fmt.Println("\n--- Experiment 1: Cold Start Handshake (Expect > 500ms latency) ---")
 	start := time.Now()
-	
+
 	if err := alice.Handshake("did:qlink:bob"); err != nil {
 		panic(err)
 	}
-	
+
 	duration := time.Since(start)
 	fmt.Printf(">>> Handshake 1 Finished in %v\n", duration)
 
@@ -79,7 +79,7 @@ func main() {
 	// Experiment 2: Ratchet Communication
 	// =========================================================================
 	fmt.Println("\n--- Experiment 2: Secure Communication & Ratchet ---")
-	
+
 	// Msg 1
 	fmt.Println(">>> Alice sending 'Msg 1'...")
 	alice.SendMessage("Hello Bob, this is Message 1")
@@ -96,14 +96,14 @@ func main() {
 	fmt.Println("\n--- Experiment 3: Warm Handshake (Optimistic Cache) ---")
 	// Simulate a new handshake request (e.g., previous session expired or new device)
 	// Alice already has Bob's doc in her cache from Exp 1.
-	
+
 	start = time.Now()
-	
+
 	if err := alice.Handshake("did:qlink:bob"); err != nil {
 		panic(err)
 	}
-	
-duration = time.Since(start)
+
+	duration = time.Since(start)
 	fmt.Printf(">>> Handshake 2 Finished in %v (Should be near instant)\n", duration)
 
 	fmt.Println("\n=== Simulation Complete ===")

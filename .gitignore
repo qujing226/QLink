@@ -50,3 +50,7 @@ coverage
 .gocache/
 coverage/
 *.swp
+
+GEMINI.md
+AGENTS.md
+
